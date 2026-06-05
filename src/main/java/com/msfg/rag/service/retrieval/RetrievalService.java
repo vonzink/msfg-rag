@@ -16,6 +16,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 /**
  * Hybrid retrieval: vector similarity + keyword full-text search, merged with
@@ -32,15 +33,18 @@ public class RetrievalService {
 
     private final DocumentChunkRepository chunkRepository;
     private final EmbeddingService embeddingService;
+    private final RerankerService rerankerService;
     private final ObjectMapper objectMapper;
     private final RagProperties.Retrieval config;
 
     public RetrievalService(DocumentChunkRepository chunkRepository,
                             EmbeddingService embeddingService,
+                            RerankerService rerankerService,
                             ObjectMapper objectMapper,
                             RagProperties properties) {
         this.chunkRepository = chunkRepository;
         this.embeddingService = embeddingService;
+        this.rerankerService = rerankerService;
         this.objectMapper = objectMapper;
         this.config = properties.retrieval();
     }
@@ -52,13 +56,16 @@ public class RetrievalService {
         }
 
         // Fetch a wider candidate pool from each method, then merge.
-        int candidatePool = config.topK() * 2;
+        int candidatePool = config.rerankEnabled()
+                ? config.rerankCandidates()
+                : config.topK() * 2;
 
         float[] questionEmbedding = embeddingService.embed(question);
         String vectorLiteral = EmbeddingService.toVectorLiteral(questionEmbedding);
 
         List<ChunkSearchResult> vectorHits = chunkRepository.searchByVector(vectorLiteral, candidatePool);
-        List<ChunkSearchResult> keywordHits = chunkRepository.searchByKeyword(question, candidatePool);
+        List<ChunkSearchResult> keywordHits = chunkRepository.searchByKeyword(
+                toOrQuery(question), candidatePool);
 
         Map<UUID, MutableHit> merged = new HashMap<>();
         for (ChunkSearchResult hit : vectorHits) {
@@ -76,11 +83,20 @@ public class RetrievalService {
                     .keywordScore = normalized;
         }
 
+        String questionProgram = detectProgram(question);
         List<RetrievedChunk> ranked = merged.values().stream()
-                .map(this::toRetrievedChunk)
+                .map(hit -> toRetrievedChunk(hit, questionProgram))
                 .sorted(Comparator.comparingDouble(RetrievedChunk::combinedScore).reversed())
-                .limit(config.topK())
+                .limit(candidatePool)
                 .toList();
+
+        // LLM rerank: hybrid scores find the neighborhood, the reranker picks
+        // the truly relevant chunks. Replaces combinedScore with rerank score.
+        if (config.rerankEnabled() && !ranked.isEmpty()) {
+            ranked = rerankerService.rerank(question, ranked, config.topK());
+        } else if (ranked.size() > config.topK()) {
+            ranked = ranked.subList(0, config.topK());
+        }
 
         double confidence = ranked.isEmpty() ? 0.0 : ranked.getFirst().combinedScore();
         boolean sufficient = confidence >= config.confidenceThreshold()
@@ -92,9 +108,23 @@ public class RetrievalService {
         return new RetrievalResult(ranked, confidence, sufficient);
     }
 
-    private RetrievedChunk toRetrievedChunk(MutableHit hit) {
+    private RetrievedChunk toRetrievedChunk(MutableHit hit, String questionProgram) {
         double combined = config.vectorWeight() * hit.vectorScore
                 + config.keywordWeight() * hit.keywordScore;
+
+        // Program-aware ranking: when the question names a loan program,
+        // boost sources for that program and demote clearly mismatched ones.
+        // Prevents e.g. Fannie Mae's 620 conventional minimum from answering
+        // an FHA credit score question.
+        if (questionProgram != null) {
+            String chunkProgram = detectProgram(
+                    hit.source.getSourceName() + " " + hit.source.getDocumentTitle());
+            if (chunkProgram != null) {
+                combined = chunkProgram.equals(questionProgram)
+                        ? Math.min(1.0, combined * 1.2)
+                        : combined * 0.4;
+            }
+        }
 
         String section = null;
         Integer pageNumber = null;
@@ -126,6 +156,52 @@ public class RetrievalService {
                 hit.keywordScore,
                 combined
         );
+    }
+
+    private static final java.util.Set<String> STOPWORDS = java.util.Set.of(
+            "a", "an", "and", "are", "as", "at", "be", "by", "can", "do", "does",
+            "for", "from", "how", "i", "in", "is", "it", "my", "of", "on", "or",
+            "the", "to", "use", "used", "we", "what", "when", "which", "will", "with");
+
+    /**
+     * Converts a natural-language question into an OR'd tsquery
+     * ("minimum | credit | score | fha | loan"). websearch_to_tsquery ANDs
+     * every word, so one missing term zeroes the whole match — far too
+     * brittle for conversational questions against guideline text.
+     */
+    static String toOrQuery(String question) {
+        String[] words = question.toLowerCase(java.util.Locale.US)
+                .replaceAll("[^a-z0-9 ]", " ")
+                .split("\\s+");
+        return java.util.Arrays.stream(words)
+                .filter(w -> w.length() > 1 && !STOPWORDS.contains(w))
+                .distinct()
+                .collect(Collectors.joining(" OR "));
+    }
+
+    /**
+     * Detects which loan program a piece of text refers to.
+     * Used for both the user question and source names/titles.
+     */
+    private static String detectProgram(String text) {
+        if (text == null) {
+            return null;
+        }
+        String lower = text.toLowerCase(java.util.Locale.US);
+        if (lower.contains("fha") || lower.contains("hud") || lower.contains("4000.1")) {
+            return "FHA";
+        }
+        if (lower.matches(".*\\bva\\b.*") || lower.contains("veteran")) {
+            return "VA";
+        }
+        if (lower.contains("usda") || lower.contains("rural development")) {
+            return "USDA";
+        }
+        if (lower.contains("conventional") || lower.contains("fannie")
+                || lower.contains("freddie") || lower.contains("conforming")) {
+            return "CONVENTIONAL";
+        }
+        return null;
     }
 
     private static double clamp(Double value) {

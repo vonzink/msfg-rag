@@ -26,7 +26,9 @@ public record RagProperties(
             int minResults,
             double confidenceThreshold,
             double vectorWeight,
-            double keywordWeight
+            double keywordWeight,
+            boolean rerankEnabled,
+            int rerankCandidates
     ) {}
 
     public record Chunking(

@@ -30,6 +30,14 @@ public class PromptBuilderService {
             5. Use careful wording such as "may," "generally," and "subject to full loan review."
             6. Include citations from the provided source context.
             7. Keep the answer clear and borrower-friendly.
+            8. In citations, copy source_name, document_name, section, page_number, and
+               effective_date EXACTLY as given in the source context metadata. If a field is
+               not present for a source, set it to null. NEVER invent page numbers, section
+               names, or dates.
+            9. Pay attention to which loan program each source covers (FHA, VA, conventional).
+               If the question is about one program, do not answer using a different
+               program's guideline. If no source covers the right program, say you cannot
+               find enough information.
 
             Approved Source Context:
             %s

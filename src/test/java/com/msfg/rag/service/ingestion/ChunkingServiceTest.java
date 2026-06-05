@@ -19,7 +19,7 @@ class ChunkingServiceTest {
     void setUp() {
         RagProperties properties = new RagProperties(
                 new RagProperties.Routing("anthropic", "openai"),
-                new RagProperties.Retrieval(8, 3, 0.55, 0.65, 0.35),
+                new RagProperties.Retrieval(8, 3, 0.35, 0.65, 0.35, true, 24),
                 new RagProperties.Chunking(1000, 1200, 150),
                 new RagProperties.Storage("./data/test"),
                 new RagProperties.Admin("test-key"),
