@@ -1,0 +1,20 @@
+# Gradle
+.gradle/
+build/
+
+# IDE
+.idea/
+*.iml
+.vscode/
+
+# Environment / secrets — never commit
+.env
+
+# Local document storage
+data/
+
+# OS
+.DS_Store
+
+# Logs
+*.log
