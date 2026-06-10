@@ -70,4 +70,109 @@ class DomainPackLoaderTest {
                 DomainPackLoader.PackValidationException.class, () -> loader.load(dir));
         assertTrue(ex.getMessage().contains("pack.yaml"), ex.getMessage());
     }
+
+    @Test
+    void missingFileFailsNamingTheFile() throws IOException {
+        Path dir = packCopy();
+        Files.delete(dir.resolve("guardrails.yaml"));
+        var ex = assertThrows(DomainPackLoader.PackValidationException.class,
+                () -> loader.load(dir));
+        assertTrue(ex.getMessage().contains("guardrails.yaml"), ex.getMessage());
+    }
+
+    @Test
+    void emptyProhibitedPhrasesFailsBoot() throws IOException {
+        Path dir = packCopy();
+        Files.writeString(dir.resolve("guardrails.yaml"), """
+                prohibited-phrases: []
+                eligible-phrase: you are eligible
+                canned-answers:
+                  no-source: a
+                  escalation: b
+                  legal: c
+                  tax: d
+                  live-rates: e
+                  fraud: f
+                """);
+        var ex = assertThrows(DomainPackLoader.PackValidationException.class,
+                () -> loader.load(dir));
+        assertTrue(ex.getMessage().contains("prohibited-phrases"), ex.getMessage());
+    }
+
+    @Test
+    void blankCannedAnswerFailsBoot() throws IOException {
+        Path dir = packCopy();
+        Files.writeString(dir.resolve("guardrails.yaml"), """
+                prohibited-phrases:
+                  - you are approved
+                eligible-phrase: you are eligible
+                canned-answers:
+                  no-source: ""
+                  escalation: b
+                  legal: c
+                  tax: d
+                  live-rates: e
+                  fraud: f
+                """);
+        var ex = assertThrows(DomainPackLoader.PackValidationException.class,
+                () -> loader.load(dir));
+        assertTrue(ex.getMessage().contains("no-source"), ex.getMessage());
+    }
+
+    @Test
+    void templateWithoutThreePlaceholdersFailsBoot() throws IOException {
+        Path dir = packCopy();
+        Files.writeString(dir.resolve("prompt.yaml"), "template: only %s here\n");
+        var ex = assertThrows(DomainPackLoader.PackValidationException.class,
+                () -> loader.load(dir));
+        assertTrue(ex.getMessage().contains("template"), ex.getMessage());
+    }
+
+    @Test
+    void invalidRegexFailsBoot() throws IOException {
+        Path dir = packCopy();
+        Files.writeString(dir.resolve("classifier.yaml"), """
+                rules:
+                  - category: FRAUD
+                    patterns:
+                      - '([unclosed'
+                """);
+        var ex = assertThrows(DomainPackLoader.PackValidationException.class,
+                () -> loader.load(dir));
+        assertTrue(ex.getMessage().contains("classifier.yaml"), ex.getMessage());
+    }
+
+    @Test
+    void invalidSlugFailsBoot() throws IOException {
+        Path dir = packCopy();
+        Files.writeString(dir.resolve("pack.yaml"), """
+                slug: "Not A Slug!"
+                company-name: Test Company
+                disclaimer: Educational only.
+                """);
+        var ex = assertThrows(DomainPackLoader.PackValidationException.class,
+                () -> loader.load(dir));
+        assertTrue(ex.getMessage().contains("slug"), ex.getMessage());
+    }
+
+    // Locks the loader's strict mode: a typo'd key must fail, never be ignored.
+    @Test
+    void unknownYamlKeyFailsNamingTheFile() throws IOException {
+        Path dir = packCopy();
+        Files.writeString(dir.resolve("guardrails.yaml"), """
+                prohibited-phrases:
+                  - you are approved
+                eligible-phrases: oops-typo
+                canned-answers:
+                  no-source: a
+                  escalation: b
+                  legal: c
+                  tax: d
+                  live-rates: e
+                  fraud: f
+                """);
+        var ex = assertThrows(DomainPackLoader.PackValidationException.class,
+                () -> loader.load(dir));
+        assertTrue(ex.getMessage().contains("guardrails.yaml"), ex.getMessage());
+    }
 }

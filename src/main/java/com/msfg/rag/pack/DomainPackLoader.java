@@ -11,6 +11,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Pattern;
+import java.util.regex.PatternSyntaxException;
 
 /**
  * Reads the five YAML files of a domain pack directory into a DomainPack.
@@ -62,7 +64,72 @@ public class DomainPackLoader {
                                 p.wordPatterns() == null ? List.of() : p.wordPatterns()))
                         .toList());
 
-        return pack; // validation added in Task 2
+        validate(packDir, pack);
+        return pack;
+    }
+
+    private static final Pattern SLUG = Pattern.compile("[a-z0-9-]+");
+
+    private void validate(Path dir, DomainPack p) {
+        require(dir, "pack.yaml", "slug", p.slug() != null && SLUG.matcher(p.slug()).matches());
+        require(dir, "pack.yaml", "company-name", notBlank(p.companyName()));
+        require(dir, "pack.yaml", "disclaimer", notBlank(p.disclaimer()));
+
+        require(dir, "prompt.yaml", "template (needs exactly 3 %s placeholders)",
+                p.promptTemplate() != null && p.promptTemplate().split("%s", -1).length == 4);
+
+        require(dir, "guardrails.yaml", "prohibited-phrases",
+                p.guardrails() != null && p.guardrails().prohibitedPhrases() != null
+                        && !p.guardrails().prohibitedPhrases().isEmpty());
+        require(dir, "guardrails.yaml", "eligible-phrase", notBlank(p.guardrails().eligiblePhrase()));
+        DomainPack.CannedAnswers c = p.guardrails().cannedAnswers();
+        require(dir, "guardrails.yaml", "canned-answers", c != null);
+        require(dir, "guardrails.yaml", "canned-answers.no-source", notBlank(c.noSource()));
+        require(dir, "guardrails.yaml", "canned-answers.escalation", notBlank(c.escalation()));
+        require(dir, "guardrails.yaml", "canned-answers.legal", notBlank(c.legal()));
+        require(dir, "guardrails.yaml", "canned-answers.tax", notBlank(c.tax()));
+        require(dir, "guardrails.yaml", "canned-answers.live-rates", notBlank(c.liveRates()));
+        require(dir, "guardrails.yaml", "canned-answers.fraud", notBlank(c.fraud()));
+
+        require(dir, "classifier.yaml", "rules",
+                p.classifierRules() != null && !p.classifierRules().isEmpty());
+        for (DomainPack.ClassifierRule rule : p.classifierRules()) {
+            require(dir, "classifier.yaml", "rules.category", rule.category() != null);
+            require(dir, "classifier.yaml", "rules.patterns",
+                    rule.patterns() != null && !rule.patterns().isEmpty());
+            compileAll(dir, "classifier.yaml", rule.patterns());
+        }
+
+        require(dir, "retrieval.yaml", "acronyms",
+                p.acronymExpansions() != null && !p.acronymExpansions().isEmpty());
+        require(dir, "retrieval.yaml", "programs",
+                p.programRules() != null && !p.programRules().isEmpty());
+        for (DomainPack.ProgramRule rule : p.programRules()) {
+            require(dir, "retrieval.yaml", "programs.program", notBlank(rule.program()));
+            compileAll(dir, "retrieval.yaml", rule.wordPatterns());
+        }
+    }
+
+    private void compileAll(Path dir, String file, List<String> patterns) {
+        for (String pattern : patterns) {
+            try {
+                Pattern.compile(pattern);
+            } catch (PatternSyntaxException e) {
+                throw new PackValidationException("domain pack " + dir + ": " + file
+                        + ": invalid regex \"" + pattern + "\": " + e.getDescription());
+            }
+        }
+    }
+
+    private static boolean notBlank(String s) {
+        return s != null && !s.isBlank();
+    }
+
+    private void require(Path dir, String file, String field, boolean ok) {
+        if (!ok) {
+            throw new PackValidationException(
+                    "domain pack " + dir + ": " + file + ": invalid or empty " + field);
+        }
     }
 
     private <T> T read(Path packDir, String fileName, Class<T> type) {
