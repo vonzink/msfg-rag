@@ -88,7 +88,7 @@ class AskServiceTest {
         AnswerSourceRepository sources = mock(AnswerSourceRepository.class);
         when(sources.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-        return new AskService(classifier, retrieval, promptBuilder, router,
+        return new AskService(TestPacks.msfg(), classifier, retrieval, promptBuilder, router,
                 new AnswerValidationService(TestPacks.msfg()), audit,
                 conversations, messages, sources, new ObjectMapper());
     }
@@ -118,7 +118,7 @@ class AskServiceTest {
         // self-contradictory response (refusal text + 8 citations).
         assertTrue(response.citations().isEmpty(),
                 "a model refusal must not be decorated with backfilled citations");
-        assertEquals(AskService.NO_SOURCE_ANSWER, response.answer(),
+        assertEquals(TestPacks.msfg().guardrails().cannedAnswers().noSource(), response.answer(),
                 "a refusal must return the canned refusal text, never the model's raw refusal");
         assertEquals("pack-disclaimer", response.disclaimer(),
                 "response disclaimer must come from the pack, not the model echo");
