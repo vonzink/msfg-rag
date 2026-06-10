@@ -3,6 +3,7 @@ package com.msfg.rag.service.retrieval;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.msfg.rag.config.RagProperties;
+import com.msfg.rag.pack.DomainPack;
 import com.msfg.rag.repository.ChunkSearchResult;
 import com.msfg.rag.repository.DocumentChunkRepository;
 import com.msfg.rag.service.ingestion.EmbeddingService;
@@ -23,6 +24,10 @@ import java.util.stream.Collectors;
  * a weighted score. Only chunks from active, currently effective documents are
  * eligible (enforced in the repository queries).
  *
+ * Acronym expansions and program detection rules come from the domain pack
+ * (injected via the constructor) so they are company-specific and versioned
+ * alongside the pack YAML, not hardcoded here.
+ *
  * Compliance note: the sufficientEvidence flag is the gate that prevents the
  * model from answering without approved source material. Do not bypass it.
  */
@@ -36,17 +41,33 @@ public class RetrievalService {
     private final RerankerService rerankerService;
     private final ObjectMapper objectMapper;
     private final RagProperties.Retrieval config;
+    private final Map<String, String> acronyms;
+    private final List<CompiledProgram> programs;
 
     public RetrievalService(DocumentChunkRepository chunkRepository,
                             EmbeddingService embeddingService,
                             RerankerService rerankerService,
                             ObjectMapper objectMapper,
-                            RagProperties properties) {
+                            RagProperties properties,
+                            DomainPack pack) {
         this.chunkRepository = chunkRepository;
         this.embeddingService = embeddingService;
         this.rerankerService = rerankerService;
         this.objectMapper = objectMapper;
         this.config = properties.retrieval();
+        this.acronyms = pack.acronymExpansions();
+        this.programs = compilePrograms(pack.programRules());
+    }
+
+    /** A program rule with its word-boundary regexes precompiled. */
+    record CompiledProgram(String name, List<String> keywords, List<java.util.regex.Pattern> patterns) {}
+
+    static List<CompiledProgram> compilePrograms(List<DomainPack.ProgramRule> rules) {
+        return rules.stream().map(r -> new CompiledProgram(
+                r.program(),
+                r.keywords(),
+                r.wordPatterns().stream().map(java.util.regex.Pattern::compile).toList()))
+                .toList();
     }
 
     @Transactional(readOnly = true)
@@ -62,9 +83,9 @@ public class RetrievalService {
 
         // Expand mortgage acronyms (PMI -> private mortgage insurance) so terse
         // acronym questions retrieve the same definitions as their fuller
-        // phrasing. Only the retrieval inputs use the expansion; detectProgram
+        // phrasing. Only the retrieval inputs use the expansion; detectPrograms
         // and the reranker below still operate on the original question.
-        String expandedQuestion = expandQuery(question);
+        String expandedQuestion = expandQuery(question, acronyms);
 
         float[] questionEmbedding = embeddingService.embed(expandedQuestion);
         String vectorLiteral = EmbeddingService.toVectorLiteral(questionEmbedding);
@@ -89,7 +110,7 @@ public class RetrievalService {
                     .keywordScore = normalized;
         }
 
-        java.util.Set<String> questionPrograms = detectPrograms(question);
+        java.util.Set<String> questionPrograms = detectPrograms(question, programs);
         List<RetrievedChunk> ranked = merged.values().stream()
                 .map(hit -> toRetrievedChunk(hit, questionPrograms))
                 .sorted(Comparator.comparingDouble(RetrievedChunk::combinedScore).reversed())
@@ -124,8 +145,9 @@ public class RetrievalService {
         // FHA credit-score question, while still letting a question that names
         // TWO programs ("FHA vs conventional") retrieve both sides.
         if (!questionPrograms.isEmpty()) {
-            String chunkProgram = detectProgram(
-                    hit.source.getSourceName() + " " + hit.source.getDocumentTitle());
+            String chunkProgram = detectPrograms(
+                    hit.source.getSourceName() + " " + hit.source.getDocumentTitle(),
+                    programs).stream().findFirst().orElse(null);
             combined = Math.min(1.0, combined * programScoreFactor(questionPrograms, chunkProgram));
         }
 
@@ -167,38 +189,15 @@ public class RetrievalService {
             "the", "to", "use", "used", "we", "what", "when", "which", "will", "with");
 
     /**
-     * Common mortgage acronyms mapped to their expansions. Terse acronym
-     * questions ("What is PMI?") embed weakly and seldom keyword-match the
-     * definition, so the answer model self-escalates. Appending the expansion
-     * to the retrieval text closes the gap with fuller phrasings without
-     * re-embedding the corpus or touching the stored chunks. Keys are lowercase.
-     */
-    private static final Map<String, String> ACRONYM_EXPANSIONS = Map.ofEntries(
-            Map.entry("pmi", "private mortgage insurance"),
-            Map.entry("mip", "mortgage insurance premium"),
-            Map.entry("dti", "debt-to-income"),
-            Map.entry("ltv", "loan-to-value"),
-            Map.entry("cltv", "combined loan-to-value"),
-            Map.entry("piti", "principal interest taxes insurance"),
-            Map.entry("arm", "adjustable-rate mortgage"),
-            Map.entry("heloc", "home equity line of credit"),
-            Map.entry("hoa", "homeowners association"),
-            Map.entry("apr", "annual percentage rate"),
-            Map.entry("aus", "automated underwriting system"),
-            Map.entry("fha", "Federal Housing Administration"),
-            Map.entry("va", "Veterans Affairs"),
-            Map.entry("usda", "United States Department of Agriculture"));
-
-    /**
      * Appends expansions for any mortgage acronyms in the question so "What is
      * PMI?" retrieves the same sources as "What is private mortgage insurance?".
      * The expanded text feeds both the embedding and the keyword query; the
      * original question still drives program detection and reranking. Returns
      * the question unchanged when it contains no known acronym. Matching is
      * token-based, so an acronym only expands as a standalone word (the "va" in
-     * "available" never triggers).
+     * "available" never triggers). Expansions come from the domain pack.
      */
-    static String expandQuery(String question) {
+    static String expandQuery(String question, Map<String, String> acronyms) {
         if (question == null || question.isBlank()) {
             return question;
         }
@@ -207,7 +206,7 @@ public class RetrievalService {
                 .split("\\s+");
         java.util.LinkedHashSet<String> expansions = new java.util.LinkedHashSet<>();
         for (String token : tokens) {
-            String expansion = ACRONYM_EXPANSIONS.get(token);
+            String expansion = acronyms.get(token);
             if (expansion != null) {
                 expansions.add(expansion);
             }
@@ -236,34 +235,24 @@ public class RetrievalService {
 
     /**
      * Detects every loan program a piece of text refers to, in priority order
-     * (FHA, VA, USDA, CONVENTIONAL). A comparison question naming two programs
+     * defined by the domain pack. A comparison question naming two programs
      * returns both, so neither side is demoted in {@link #toRetrievedChunk}.
+     * Rules come from the domain pack (pre-compiled via {@link #compilePrograms}).
      */
-    static java.util.Set<String> detectPrograms(String text) {
-        java.util.LinkedHashSet<String> programs = new java.util.LinkedHashSet<>();
+    static java.util.Set<String> detectPrograms(String text, List<CompiledProgram> programs) {
+        java.util.LinkedHashSet<String> found = new java.util.LinkedHashSet<>();
         if (text == null) {
-            return programs;
+            return found;
         }
         String lower = text.toLowerCase(java.util.Locale.US);
-        if (lower.contains("fha") || lower.contains("hud") || lower.contains("4000.1")) {
-            programs.add("FHA");
+        for (CompiledProgram program : programs) {
+            boolean hit = program.keywords().stream().anyMatch(lower::contains)
+                    || program.patterns().stream().anyMatch(p -> p.matcher(lower).find());
+            if (hit) {
+                found.add(program.name());
+            }
         }
-        if (lower.matches(".*\\bva\\b.*") || lower.contains("veteran")) {
-            programs.add("VA");
-        }
-        if (lower.contains("usda") || lower.contains("rural development")) {
-            programs.add("USDA");
-        }
-        if (lower.contains("conventional") || lower.contains("fannie")
-                || lower.contains("freddie") || lower.contains("conforming")) {
-            programs.add("CONVENTIONAL");
-        }
-        return programs;
-    }
-
-    /** Single highest-priority program for a chunk's source text (null if none). */
-    private static String detectProgram(String text) {
-        return detectPrograms(text).stream().findFirst().orElse(null);
+        return found;
     }
 
     /**
