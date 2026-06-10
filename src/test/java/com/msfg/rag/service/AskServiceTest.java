@@ -8,6 +8,7 @@ import com.msfg.rag.provider.AiResponse;
 import com.msfg.rag.repository.AnswerSourceRepository;
 import com.msfg.rag.repository.ConversationRepository;
 import com.msfg.rag.repository.MessageRepository;
+import com.msfg.rag.pack.TestPacks;
 import com.msfg.rag.service.ai.AnswerValidationService;
 import com.msfg.rag.service.ai.ModelAnswer;
 import com.msfg.rag.service.ai.ModelRouterService;
@@ -88,7 +89,7 @@ class AskServiceTest {
         when(sources.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         return new AskService(classifier, retrieval, promptBuilder, router,
-                new AnswerValidationService(), audit,
+                new AnswerValidationService(TestPacks.msfg()), audit,
                 conversations, messages, sources, new ObjectMapper());
     }
 

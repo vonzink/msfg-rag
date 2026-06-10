@@ -1,6 +1,7 @@
 package com.msfg.rag.service.ai;
 
 import com.msfg.rag.dto.CitationDto;
+import com.msfg.rag.pack.TestPacks;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -16,7 +17,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 class AnswerValidationServiceTest {
 
-    private final AnswerValidationService validator = new AnswerValidationService();
+    private final AnswerValidationService validator = new AnswerValidationService(TestPacks.msfg());
 
     private static final List<CitationDto> CITATIONS = List.of(
             new CitationDto("Fannie Mae Selling Guide", "selling-guide.pdf",
