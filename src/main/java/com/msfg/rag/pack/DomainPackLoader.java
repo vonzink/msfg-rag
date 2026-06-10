@@ -9,6 +9,7 @@ import com.msfg.rag.service.ai.QuestionCategory;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.IllegalFormatException;
 import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
@@ -44,6 +45,32 @@ public class DomainPackLoader {
         ClassifierFile classifierFile = read(packDir, "classifier.yaml", ClassifierFile.class);
         RetrievalFile retrievalFile = read(packDir, "retrieval.yaml", RetrievalFile.class);
 
+        // Element-level checks BEFORE assembly: List.copyOf/Map.copyOf in the
+        // record constructors reject null elements with a bare NPE, which
+        // would bypass the file+field error contract.
+        requireElementsNotBlank(packDir, "guardrails.yaml", "prohibited-phrases",
+                guardrailsFile.prohibitedPhrases());
+        if (classifierFile.rules() != null) {
+            for (ClassifierRuleFile rule : classifierFile.rules()) {
+                requireElementsNotBlank(packDir, "classifier.yaml", "rules.patterns", rule.patterns());
+            }
+        }
+        if (retrievalFile.acronyms() != null) {
+            for (Map.Entry<String, String> entry : retrievalFile.acronyms().entrySet()) {
+                if (entry.getKey() == null || entry.getKey().isBlank()
+                        || entry.getValue() == null || entry.getValue().isBlank()) {
+                    throw new PackValidationException("domain pack " + packDir
+                            + ": retrieval.yaml: invalid or empty acronyms entry \"" + entry.getKey() + "\"");
+                }
+            }
+        }
+        if (retrievalFile.programs() != null) {
+            for (ProgramFile program : retrievalFile.programs()) {
+                requireElementsNotBlank(packDir, "retrieval.yaml", "programs.keywords", program.keywords());
+                requireElementsNotBlank(packDir, "retrieval.yaml", "programs.word-patterns", program.wordPatterns());
+            }
+        }
+
         DomainPack pack = new DomainPack(
                 packFile.slug(),
                 packFile.companyName(),
@@ -71,12 +98,18 @@ public class DomainPackLoader {
     private static final Pattern SLUG = Pattern.compile("[a-z0-9-]+");
 
     private void validate(Path dir, DomainPack p) {
-        require(dir, "pack.yaml", "slug", p.slug() != null && SLUG.matcher(p.slug()).matches());
+        require(dir, "pack.yaml", "slug (must match [a-z0-9-]+)", p.slug() != null && SLUG.matcher(p.slug()).matches());
         require(dir, "pack.yaml", "company-name", notBlank(p.companyName()));
         require(dir, "pack.yaml", "disclaimer", notBlank(p.disclaimer()));
 
         require(dir, "prompt.yaml", "template (needs exactly 3 %s placeholders)",
                 p.promptTemplate() != null && p.promptTemplate().split("%s", -1).length == 4);
+        try {
+            p.promptTemplate().formatted("", "", "");
+        } catch (IllegalFormatException e) {
+            throw new PackValidationException("domain pack " + dir
+                    + ": prompt.yaml: template is not a valid format string: " + e.getMessage());
+        }
 
         require(dir, "guardrails.yaml", "prohibited-phrases",
                 p.guardrails() != null && p.guardrails().prohibitedPhrases() != null
@@ -112,11 +145,25 @@ public class DomainPackLoader {
 
     private void compileAll(Path dir, String file, List<String> patterns) {
         for (String pattern : patterns) {
+            require(dir, file, "pattern", notBlank(pattern));
             try {
                 Pattern.compile(pattern);
             } catch (PatternSyntaxException e) {
                 throw new PackValidationException("domain pack " + dir + ": " + file
                         + ": invalid regex \"" + pattern + "\": " + e.getDescription());
+            }
+        }
+    }
+
+    /** Null list is fine here — list-level nullness/emptiness is checked in validate(). */
+    private void requireElementsNotBlank(Path dir, String file, String field, List<String> values) {
+        if (values == null) {
+            return;
+        }
+        for (String value : values) {
+            if (value == null || value.isBlank()) {
+                throw new PackValidationException(
+                        "domain pack " + dir + ": " + file + ": blank entry in " + field);
             }
         }
     }

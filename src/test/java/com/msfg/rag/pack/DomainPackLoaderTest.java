@@ -140,6 +140,7 @@ class DomainPackLoaderTest {
         var ex = assertThrows(DomainPackLoader.PackValidationException.class,
                 () -> loader.load(dir));
         assertTrue(ex.getMessage().contains("classifier.yaml"), ex.getMessage());
+        assertTrue(ex.getMessage().contains("invalid regex"), ex.getMessage());
     }
 
     @Test
@@ -162,6 +163,7 @@ class DomainPackLoaderTest {
         Files.writeString(dir.resolve("guardrails.yaml"), """
                 prohibited-phrases:
                   - you are approved
+                eligible-phrase: you are eligible
                 eligible-phrases: oops-typo
                 canned-answers:
                   no-source: a
@@ -173,6 +175,86 @@ class DomainPackLoaderTest {
                 """);
         var ex = assertThrows(DomainPackLoader.PackValidationException.class,
                 () -> loader.load(dir));
-        assertTrue(ex.getMessage().contains("guardrails.yaml"), ex.getMessage());
+        assertTrue(ex.getMessage().contains("eligible-phrases"), ex.getMessage());
+    }
+
+    @Test
+    void invalidRegexAlsoNamesBadRegexInMessage() throws IOException {
+        Path dir = packCopy();
+        Files.writeString(dir.resolve("classifier.yaml"), """
+                rules:
+                  - category: FRAUD
+                    patterns:
+                      - '([unclosed'
+                """);
+        var ex = assertThrows(DomainPackLoader.PackValidationException.class,
+                () -> loader.load(dir));
+        assertTrue(ex.getMessage().contains("classifier.yaml"), ex.getMessage());
+        assertTrue(ex.getMessage().contains("invalid regex"), ex.getMessage());
+    }
+
+    @Test
+    void invalidWordPatternFailsBoot() throws IOException {
+        Path dir = packCopy();
+        Files.writeString(dir.resolve("retrieval.yaml"), """
+                acronyms:
+                  pmi: private mortgage insurance
+                programs:
+                  - program: VA
+                    keywords:
+                      - veteran
+                    word-patterns:
+                      - '([unclosed'
+                """);
+        var ex = assertThrows(DomainPackLoader.PackValidationException.class,
+                () -> loader.load(dir));
+        assertTrue(ex.getMessage().contains("invalid regex"), ex.getMessage());
+    }
+
+    @Test
+    void danglingListEntryFailsNamingFileAndField() throws IOException {
+        Path dir = packCopy();
+        Files.writeString(dir.resolve("guardrails.yaml"), """
+                prohibited-phrases:
+                  - you are approved
+                  -
+                eligible-phrase: you are eligible
+                canned-answers:
+                  no-source: a
+                  escalation: b
+                  legal: c
+                  tax: d
+                  live-rates: e
+                  fraud: f
+                """);
+        var ex = assertThrows(DomainPackLoader.PackValidationException.class,
+                () -> loader.load(dir));
+        assertTrue(ex.getMessage().contains("prohibited-phrases"), ex.getMessage());
+    }
+
+    @Test
+    void emptyAcronymValueFailsNamingTheEntry() throws IOException {
+        Path dir = packCopy();
+        Files.writeString(dir.resolve("retrieval.yaml"), """
+                acronyms:
+                  pmi:
+                programs:
+                  - program: FHA
+                    keywords:
+                      - fha
+                """);
+        var ex = assertThrows(DomainPackLoader.PackValidationException.class,
+                () -> loader.load(dir));
+        assertTrue(ex.getMessage().contains("acronyms"), ex.getMessage());
+    }
+
+    @Test
+    void templateWithStrayFormatDirectiveFailsBoot() throws IOException {
+        Path dir = packCopy();
+        Files.writeString(dir.resolve("prompt.yaml"),
+                "template: 'a %s b %s c %s plus stray %q'\n");
+        var ex = assertThrows(DomainPackLoader.PackValidationException.class,
+                () -> loader.load(dir));
+        assertTrue(ex.getMessage().contains("format string"), ex.getMessage());
     }
 }
