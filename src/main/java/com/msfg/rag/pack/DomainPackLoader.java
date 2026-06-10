@@ -9,6 +9,7 @@ import com.msfg.rag.service.ai.QuestionCategory;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.EnumSet;
 import java.util.IllegalFormatException;
 import java.util.List;
 import java.util.Map;
@@ -50,6 +51,11 @@ public class DomainPackLoader {
         // would bypass the file+field error contract.
         requireElementsNotBlank(packDir, "guardrails.yaml", "prohibited-phrases",
                 guardrailsFile.prohibitedPhrases());
+        requireLowercase(packDir, "guardrails.yaml", "prohibited-phrases",
+                guardrailsFile.prohibitedPhrases());
+        requireLowercase(packDir, "guardrails.yaml", "eligible-phrase",
+                guardrailsFile.eligiblePhrase() == null ? null
+                        : List.of(guardrailsFile.eligiblePhrase()));
         if (classifierFile.rules() != null) {
             for (ClassifierRuleFile rule : classifierFile.rules()) {
                 requireElementsNotBlank(packDir, "classifier.yaml", "rules.patterns", rule.patterns());
@@ -62,12 +68,17 @@ public class DomainPackLoader {
                     throw new PackValidationException("domain pack " + packDir
                             + ": retrieval.yaml: invalid or empty acronyms entry \"" + entry.getKey() + "\"");
                 }
+                if (!entry.getKey().equals(entry.getKey().toLowerCase(java.util.Locale.US))) {
+                    throw new PackValidationException("domain pack " + packDir
+                            + ": retrieval.yaml: entry must be lowercase: \"" + entry.getKey() + "\"");
+                }
             }
         }
         if (retrievalFile.programs() != null) {
             for (ProgramFile program : retrievalFile.programs()) {
                 requireElementsNotBlank(packDir, "retrieval.yaml", "programs.keywords", program.keywords());
                 requireElementsNotBlank(packDir, "retrieval.yaml", "programs.word-patterns", program.wordPatterns());
+                requireLowercase(packDir, "retrieval.yaml", "programs.keywords", program.keywords());
             }
         }
 
@@ -126,8 +137,13 @@ public class DomainPackLoader {
 
         require(dir, "classifier.yaml", "rules",
                 p.classifierRules() != null && !p.classifierRules().isEmpty());
+        EnumSet<QuestionCategory> seen = EnumSet.noneOf(QuestionCategory.class);
         for (DomainPack.ClassifierRule rule : p.classifierRules()) {
             require(dir, "classifier.yaml", "rules.category", rule.category() != null);
+            if (!seen.add(rule.category())) {
+                throw new PackValidationException("domain pack " + dir
+                        + ": classifier.yaml: duplicate category " + rule.category());
+            }
             require(dir, "classifier.yaml", "rules.patterns",
                     rule.patterns() != null && !rule.patterns().isEmpty());
             compileAll(dir, "classifier.yaml", rule.patterns());
@@ -164,6 +180,22 @@ public class DomainPackLoader {
             if (value == null || value.isBlank()) {
                 throw new PackValidationException(
                         "domain pack " + dir + ": " + file + ": blank entry in " + field);
+            }
+        }
+    }
+
+    /**
+     * Entries matched against lowercased text at runtime must themselves be lowercase —
+     * a mixed-case entry is a silently dead rule.
+     */
+    private void requireLowercase(Path dir, String file, String field, List<String> values) {
+        if (values == null) {
+            return;
+        }
+        for (String value : values) {
+            if (value != null && !value.equals(value.toLowerCase(java.util.Locale.US))) {
+                throw new PackValidationException("domain pack " + dir + ": " + file
+                        + ": entry must be lowercase: \"" + value + "\"");
             }
         }
     }
