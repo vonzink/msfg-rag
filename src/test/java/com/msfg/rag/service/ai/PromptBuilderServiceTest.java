@@ -41,6 +41,12 @@ class PromptBuilderServiceTest {
     }
 
     @Test
+    void requiresNonEmptyCitationsWhenSourcesProvided() {
+        String prompt = promptBuilder.build("What is PMI?", List.of(sampleChunk()));
+        assertTrue(prompt.contains("must contain at least one entry"));
+    }
+
+    @Test
     void includesDisclaimer() {
         String prompt = promptBuilder.build("What is DTI?", List.of(sampleChunk()));
         assertTrue(prompt.contains(PromptBuilderService.DISCLAIMER));

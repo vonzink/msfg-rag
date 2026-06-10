@@ -120,12 +120,21 @@ public class RerankerService {
                 return null;
             }
             double[] scores = new double[expectedCount];
+            int matched = 0;
             for (JsonNode entry : array) {
                 int index = entry.path("index").asInt(-1);
                 double score = entry.path("score").asDouble(0);
                 if (index >= 0 && index < expectedCount) {
                     scores[index] = Math.max(0, Math.min(10, score));
+                    matched++;
                 }
+            }
+            // No usable entry (empty array, wrong keys, all indexes out of
+            // range) -> treat as unparseable so the caller fails open to the
+            // original ranking. Returning the all-zero array here would zero
+            // the entire candidate pool and force a false "no source" refusal.
+            if (matched == 0) {
+                return null;
             }
             return scores;
         } catch (Exception e) {

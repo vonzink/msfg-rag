@@ -137,6 +137,18 @@ public class AskService {
                     "unparseable model response");
         }
 
+        // 4b. Salvage grounded answers that omit citations. The answer model
+        //     sometimes returns a correct, grounded answer with no citations
+        //     array; attach the approved source chunks rather than discard the
+        //     answer and escalate. We only reach here when retrieval evidence
+        //     was sufficient, so the chunks are the exact sources the prompt was
+        //     grounded in (and they are already persisted as the answer trail).
+        if (modelAnswer.citations() == null || modelAnswer.citations().isEmpty()) {
+            log.info("Model answer omitted citations; attaching {} retrieved source(s)",
+                    retrieval.chunks().size());
+        }
+        modelAnswer = ensureCitations(modelAnswer, retrieval.chunks());
+
         // 5. Compliance validation — failed answers are never shown.
         var validation = answerValidationService.validate(modelAnswer, true);
         if (!validation.valid()) {
@@ -245,6 +257,35 @@ public class AskService {
             source.setEffectiveDate(chunk.effectiveDate());
             answerSourceRepository.save(source);
         }
+    }
+
+    /**
+     * When the model returns a grounded answer but omits citations, attach the
+     * retrieved approved sources so a correct answer is not discarded and
+     * escalated. Model-supplied citations are kept as-is.
+     */
+    static ModelAnswer ensureCitations(ModelAnswer answer, List<RetrievedChunk> chunks) {
+        if (answer.citations() != null && !answer.citations().isEmpty()) {
+            return answer;
+        }
+        return new ModelAnswer(
+                answer.answer(),
+                citationsFromChunks(chunks),
+                answer.confidence(),
+                answer.humanEscalationRequired(),
+                answer.disclaimer());
+    }
+
+    /** Maps retrieved source chunks to the citation shape returned to the website. */
+    static List<CitationDto> citationsFromChunks(List<RetrievedChunk> chunks) {
+        return chunks.stream()
+                .map(chunk -> new CitationDto(
+                        chunk.sourceName(),
+                        chunk.documentName(),
+                        chunk.section(),
+                        chunk.pageNumber() == null ? null : String.valueOf(chunk.pageNumber()),
+                        chunk.effectiveDate() == null ? null : chunk.effectiveDate().toString()))
+                .toList();
     }
 
     /**

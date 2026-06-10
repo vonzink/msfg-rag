@@ -28,7 +28,12 @@ public class PromptBuilderService {
             3. Do not provide loan approval, legal advice, tax advice, or underwriting decisions.
             4. If the source context does not answer the question, say you cannot find enough information.
             5. Use careful wording such as "may," "generally," and "subject to full loan review."
-            6. Include citations from the provided source context.
+            6. Include citations from the provided source context. The "citations"
+               array is REQUIRED and must contain at least one entry whenever
+               source context is provided above. Cite every [Source N] you relied
+               on to write the answer. NEVER return an empty "citations" array
+               when source context is present — if you used the sources to answer,
+               you must list them.
             7. Keep the answer clear and borrower-friendly.
             8. In citations, copy source_name, document_name, section, page_number, and
                effective_date EXACTLY as given in the source context metadata. If a field is

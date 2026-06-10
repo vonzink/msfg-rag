@@ -46,4 +46,23 @@ class RerankerServiceTest {
         assertNull(reranker.parseScores("I cannot rank these.", 3));
         assertNull(reranker.parseScores("", 3));
     }
+
+    // A malformed/empty array must fail open to the original ranking, NOT
+    // silently score every candidate 0 (which collapses retrieval confidence
+    // to 0.0 and forces a false "no source" refusal).
+
+    @Test
+    void returnsNullForEmptyArray() {
+        assertNull(reranker.parseScores("[]", 3));
+    }
+
+    @Test
+    void returnsNullWhenNoEntryHasAUsableIndex() {
+        assertNull(reranker.parseScores("[{\"score\":5},{\"relevance\":9}]", 2));
+    }
+
+    @Test
+    void returnsNullWhenEveryIndexIsOutOfBounds() {
+        assertNull(reranker.parseScores("[{\"index\":7,\"score\":9},{\"index\":8,\"score\":4}]", 2));
+    }
 }
