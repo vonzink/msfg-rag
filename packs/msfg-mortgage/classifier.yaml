@@ -1,0 +1,40 @@
+rules:
+  - category: FRAUD
+    patterns:
+      - '\b(hide|hiding|conceal)\b.*\b(income|debt|loan|liabilit|asset)'
+      - '\b(fake|falsif|forge|doctor|alter)\w*\b.*\b(document|paystub|pay stub|w-?2|bank statement|tax return)'
+      - '\b(lie|lying)\b.*\b(lender|application|underwriter|loan)'
+      - '\bnot (tell|report|disclose)\b.*\b(lender|debt|income|loan)'
+      - '\bwithout (the )?(lender|bank) (knowing|finding out)'
+
+  - category: ELIGIBILITY
+    patterns:
+      - '\b(do|would|will|can|could) i (pre-?)?(qualify|get (pre-?)?approved)\b'
+      - '\b(am i|are we) (eligible|approved|qualified)\b'
+      - '\bwill (i|we) (be )?(approved|denied|turned down)\b'
+      - '\b(approve|deny) (me|my loan|my application)\b'
+      - '\bhow much (house|home|mortgage|loan) (can|could) (i|we) (afford|get|qualify)\b'
+
+  - category: LEGAL
+    patterns:
+      - '\b(sue|suing|lawsuit|litigation)\b'
+      - '\b(is (it|this) legal|illegal)\b'
+      - '\b(lawyer|attorney)\b.*\b(need|should|hire)\b'
+      - '\b(need|should|hire)\b.*\b(lawyer|attorney)\b'
+      - '\bbreach of contract\b'
+
+  - category: TAX
+    patterns:
+      - '\b(should|how do|how should) (i|we) file\b.*\btax'
+      - '\btax (strategy|advice|loophole)\b'
+      - '\b(write|writing) off\b.*\b(mortgage|interest|points)\b'
+      - '\b(deduct|deduction)\b.*\b(should|can) i\b'
+      - '\bclaim\b.*\bon (my|our) tax(es)?\b'
+
+  - category: LIVE_RATES
+    patterns:
+      - '\bwhat(''s| is| are)? (the |your |today)?\w* ?rates? (can i get|today|right now|currently)\b'
+      - '\b(current|today''?s?) (interest )?rates?\b'
+      - '\bquote me\b'
+      - '\brate (quote|lock)\b.*\b(today|now|get)\b'
+      - '\bwhat rate\b.*\b(get|offer|give)\b'

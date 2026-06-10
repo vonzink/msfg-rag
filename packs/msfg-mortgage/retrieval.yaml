@@ -1,0 +1,37 @@
+acronyms:
+  pmi: private mortgage insurance
+  mip: mortgage insurance premium
+  dti: debt-to-income
+  ltv: loan-to-value
+  cltv: combined loan-to-value
+  piti: principal interest taxes insurance
+  arm: adjustable-rate mortgage
+  heloc: home equity line of credit
+  hoa: homeowners association
+  apr: annual percentage rate
+  aus: automated underwriting system
+  fha: Federal Housing Administration
+  va: Veterans Affairs
+  usda: United States Department of Agriculture
+
+programs:
+  - program: FHA
+    keywords:
+      - fha
+      - hud
+      - "4000.1"
+  - program: VA
+    keywords:
+      - veteran
+    word-patterns:
+      - '\bva\b'
+  - program: USDA
+    keywords:
+      - usda
+      - rural development
+  - program: CONVENTIONAL
+    keywords:
+      - conventional
+      - fannie
+      - freddie
+      - conforming

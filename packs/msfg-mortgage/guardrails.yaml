@@ -1,0 +1,39 @@
+prohibited-phrases:
+  - you qualify
+  - you are approved
+  - you're approved
+  - you will be approved
+  - guaranteed
+  - the underwriter must accept
+  - the underwriter will accept
+  - this will close
+  - this loan will close
+  - 'legal advice:'
+  - as your lawyer
+  - as your tax advisor
+
+eligible-phrase: you are eligible
+
+canned-answers:
+  no-source: >-
+    I could not find enough information in the approved mortgage guidelines to answer
+    that confidently. Please contact a licensed loan officer for review.
+  escalation: >-
+    This question depends on your full loan file and should be reviewed by a licensed
+    loan officer. I can explain the general guideline, but I cannot determine approval
+    or eligibility here.
+  legal: >-
+    I can't provide legal advice. For legal questions about your mortgage or lender,
+    please consult a licensed attorney. I'm happy to explain general mortgage
+    guidelines if that helps.
+  tax: >-
+    I can't provide tax advice. A licensed tax professional can review your specific
+    situation. I'm happy to explain general mortgage guidelines if that helps.
+  live-rates: >-
+    I don't have access to live rate data, and rates depend on your full loan scenario.
+    A licensed loan officer at Mountain State Financial Group can provide a current,
+    personalized quote.
+  fraud: >-
+    I can't help with that. Misrepresenting income, debts, or documents on a mortgage
+    application is fraud. If you have questions about what must be disclosed, a
+    licensed loan officer can walk you through the requirements.
