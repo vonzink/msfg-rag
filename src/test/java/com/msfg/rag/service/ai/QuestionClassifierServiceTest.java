@@ -1,5 +1,6 @@
 package com.msfg.rag.service.ai;
 
+import com.msfg.rag.pack.TestPacks;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
@@ -11,7 +12,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
  */
 class QuestionClassifierServiceTest {
 
-    private final QuestionClassifierService classifier = new QuestionClassifierService();
+    private final QuestionClassifierService classifier = new QuestionClassifierService(TestPacks.msfg());
 
     @ParameterizedTest
     @ValueSource(strings = {

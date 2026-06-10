@@ -1,5 +1,6 @@
 package com.msfg.rag.service.ai;
 
+import com.msfg.rag.pack.DomainPack;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -10,34 +11,19 @@ import java.util.Locale;
  * website. An answer that fails here is never shown to the visitor —
  * the caller returns the escalation response instead.
  *
- * COMPLIANCE-CRITICAL: the prohibited phrase list implements the public
- * website safety rules in rag.md. Additions are fine; removals need review.
+ * COMPLIANCE-CRITICAL: phrase lists come from the domain pack (guardrails
+ * section). Additions to the pack are fine; removals need review.
  */
 @Service
 public class AnswerValidationService {
 
-    /** Phrases that imply approval, guarantees, or advice we cannot give. */
-    private static final List<String> PROHIBITED_PHRASES = List.of(
-            "you qualify",
-            "you are approved",
-            "you're approved",
-            "you will be approved",
-            "guaranteed",
-            "the underwriter must accept",
-            "the underwriter will accept",
-            "this will close",
-            "this loan will close",
-            "legal advice:",
-            "as your lawyer",
-            "as your tax advisor"
-    );
+    private final List<String> prohibitedPhrases;
+    private final String eligiblePhrase;
 
-    /**
-     * "You are eligible" is prohibited unless it appears as a direct quote
-     * from guideline context (rag.md rule). We approximate "direct quote" as
-     * the phrase appearing inside quotation marks.
-     */
-    private static final String ELIGIBLE_PHRASE = "you are eligible";
+    public AnswerValidationService(DomainPack pack) {
+        this.prohibitedPhrases = pack.guardrails().prohibitedPhrases();
+        this.eligiblePhrase = pack.guardrails().eligiblePhrase();
+    }
 
     public ValidationResult validate(ModelAnswer answer, boolean evidenceWasSufficient) {
         if (answer == null || answer.answer() == null || answer.answer().isBlank()) {
@@ -46,13 +32,13 @@ public class AnswerValidationService {
 
         String lower = answer.answer().toLowerCase(Locale.US);
 
-        for (String phrase : PROHIBITED_PHRASES) {
+        for (String phrase : prohibitedPhrases) {
             if (lower.contains(phrase)) {
                 return ValidationResult.fail("Prohibited phrase detected: \"" + phrase + "\"");
             }
         }
 
-        if (lower.contains(ELIGIBLE_PHRASE) && !isQuoted(answer.answer(), ELIGIBLE_PHRASE)) {
+        if (lower.contains(eligiblePhrase) && !isQuoted(answer.answer(), eligiblePhrase)) {
             return ValidationResult.fail("\"You are eligible\" used outside a direct guideline quote");
         }
 

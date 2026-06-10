@@ -19,7 +19,7 @@ import java.util.UUID;
  * e.g. a Fannie Mae Selling Guide PDF or an MSFG internal overlay policy.
  */
 @Entity
-@Table(name = "mortgage_documents")
+@Table(name = "brain_documents")
 public class MortgageDocument {
 
     @Id

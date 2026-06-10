@@ -17,14 +17,17 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 public class CorsConfig implements WebMvcConfigurer {
 
     private final String[] allowedOrigins;
+    private final String slug;
 
-    public CorsConfig(@Value("${msfg.rag.cors.allowed-origins}") String allowedOrigins) {
+    public CorsConfig(@Value("${msfg.rag.cors.allowed-origins}") String allowedOrigins,
+                      @Value("${brain.slug:mortgage}") String slug) {
         this.allowedOrigins = allowedOrigins.split(",");
+        this.slug = slug;
     }
 
     @Override
     public void addCorsMappings(CorsRegistry registry) {
-        registry.addMapping("/api/ai/mortgage/**")
+        registry.addMapping("/api/ai/" + slug + "/**")
                 .allowedOrigins(allowedOrigins)
                 .allowedMethods("POST", "OPTIONS")
                 .allowedHeaders("Content-Type")

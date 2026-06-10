@@ -68,6 +68,7 @@ public class DomainPackLoader {
                     throw new PackValidationException("domain pack " + packDir
                             + ": retrieval.yaml: invalid or empty acronyms entry \"" + entry.getKey() + "\"");
                 }
+                // Acronym keys are matched against lowercased text — must be lowercase.
                 if (!entry.getKey().equals(entry.getKey().toLowerCase(java.util.Locale.US))) {
                     throw new PackValidationException("domain pack " + packDir
                             + ": retrieval.yaml: entry must be lowercase: \"" + entry.getKey() + "\"");
@@ -185,8 +186,9 @@ public class DomainPackLoader {
     }
 
     /**
-     * Entries matched against lowercased text at runtime must themselves be lowercase —
-     * a mixed-case entry is a silently dead rule.
+     * Entries that are matched against lowercased text at runtime must themselves
+     * be lowercase — a mixed-case entry is a silently dead rule.
+     * Null list is fine — emptiness/nullness is checked elsewhere.
      */
     private void requireLowercase(Path dir, String file, String field, List<String> values) {
         if (values == null) {

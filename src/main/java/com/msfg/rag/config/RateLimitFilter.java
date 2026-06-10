@@ -6,6 +6,7 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
@@ -29,14 +30,17 @@ public class RateLimitFilter extends OncePerRequestFilter {
 
     private final Map<String, Bucket> buckets = new ConcurrentHashMap<>();
     private final int requestsPerMinute;
+    private final String askPath;
 
-    public RateLimitFilter(RagProperties properties) {
+    public RateLimitFilter(RagProperties properties,
+                           @Value("${brain.slug:mortgage}") String slug) {
         this.requestsPerMinute = properties.rateLimit().requestsPerMinute();
+        this.askPath = "/api/ai/" + slug + "/ask";
     }
 
     @Override
-    protected boolean shouldNotFilter(HttpServletRequest request) {
-        return !request.getRequestURI().equals("/api/ai/mortgage/ask");
+    public boolean shouldNotFilter(HttpServletRequest request) {
+        return !request.getRequestURI().equals(askPath);
     }
 
     @Override

@@ -14,7 +14,7 @@ import org.springframework.web.bind.annotation.RestController;
  * Public website endpoint. Rate limiting is applied by RateLimitFilter.
  */
 @RestController
-@RequestMapping("/api/ai/mortgage")
+@RequestMapping("/api/ai/${brain.slug:mortgage}")
 public class AskController {
 
     private final AskService askService;

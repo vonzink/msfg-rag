@@ -1,5 +1,6 @@
 package com.msfg.rag.service.retrieval;
 
+import com.msfg.rag.pack.TestPacks;
 import org.junit.jupiter.api.Test;
 
 import java.util.Set;
@@ -9,6 +10,11 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class RetrievalServiceTest {
+
+    private static final java.util.Map<String, String> ACRONYMS =
+            TestPacks.msfg().acronymExpansions();
+    private static final java.util.List<RetrievalService.CompiledProgram> PROGRAMS =
+            RetrievalService.compilePrograms(TestPacks.msfg().programRules());
 
     @Test
     void orQueryDropsStopwordsAndOrsTerms() {
@@ -32,25 +38,25 @@ class RetrievalServiceTest {
     @Test
     void expandsKnownAcronymByAppendingDefinition() {
         assertEquals("What is PMI? private mortgage insurance",
-                RetrievalService.expandQuery("What is PMI?"));
+                RetrievalService.expandQuery("What is PMI?", ACRONYMS));
     }
 
     @Test
     void expandsAcronymRegardlessOfCase() {
         assertEquals("what is pmi? private mortgage insurance",
-                RetrievalService.expandQuery("what is pmi?"));
+                RetrievalService.expandQuery("what is pmi?", ACRONYMS));
     }
 
     @Test
     void expandsMultipleAcronymsInQuestionOrder() {
         assertEquals("How do DTI and LTV affect approval? debt-to-income loan-to-value",
-                RetrievalService.expandQuery("How do DTI and LTV affect approval?"));
+                RetrievalService.expandQuery("How do DTI and LTV affect approval?", ACRONYMS));
     }
 
     @Test
     void leavesQuestionWithoutAcronymsUnchanged() {
         assertEquals("What documents are required to close?",
-                RetrievalService.expandQuery("What documents are required to close?"));
+                RetrievalService.expandQuery("What documents are required to close?", ACRONYMS));
     }
 
     // The expansion has to survive tokenization so the keyword arm of hybrid
@@ -58,24 +64,24 @@ class RetrievalServiceTest {
     @Test
     void expandedAcronymReachesKeywordQuery() {
         assertEquals("pmi OR private OR mortgage OR insurance",
-                RetrievalService.toOrQuery(RetrievalService.expandQuery("What is PMI?")));
+                RetrievalService.toOrQuery(RetrievalService.expandQuery("What is PMI?", ACRONYMS)));
     }
 
     @Test
     void detectsBothProgramsInAComparisonQuestion() {
         assertEquals(Set.of("FHA", "CONVENTIONAL"),
-                RetrievalService.detectPrograms("How is an FHA loan different from a conventional loan?"));
+                RetrievalService.detectPrograms("How is an FHA loan different from a conventional loan?", PROGRAMS));
     }
 
     @Test
     void detectsSingleProgram() {
         assertEquals(Set.of("FHA"),
-                RetrievalService.detectPrograms("What is the minimum credit score for an FHA loan?"));
+                RetrievalService.detectPrograms("What is the minimum credit score for an FHA loan?", PROGRAMS));
     }
 
     @Test
     void detectsNoProgramWhenNoneNamed() {
-        assertTrue(RetrievalService.detectPrograms("What documents are required to close?").isEmpty());
+        assertTrue(RetrievalService.detectPrograms("What documents are required to close?", PROGRAMS).isEmpty());
     }
 
     @Test

@@ -25,7 +25,7 @@ import java.util.UUID;
  * intentionally not mapped here.
  */
 @Entity
-@Table(name = "mortgage_document_chunks")
+@Table(name = "brain_document_chunks")
 public class DocumentChunk {
 
     @Id
