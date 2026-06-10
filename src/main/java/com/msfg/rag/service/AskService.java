@@ -187,7 +187,7 @@ public class AskService {
                 routed.response().modelName(), confidence, routed.fallbackUsed(), escalate);
 
         return new AskResponse(conversation.getId(), modelAnswer.answer(), citations,
-                confidence, escalate, PromptBuilderService.DISCLAIMER);
+                confidence, escalate, promptBuilderService.disclaimer());
     }
 
     // ------------------------------------------------------------------
@@ -219,7 +219,7 @@ public class AskService {
                 prompt, answerText, null, null, retrieval.confidence(), false, true);
 
         return new AskResponse(conversation.getId(), answerText, List.of(),
-                retrieval.confidence(), true, PromptBuilderService.DISCLAIMER);
+                retrieval.confidence(), true, promptBuilderService.disclaimer());
     }
 
     private Conversation resolveConversation(AskRequest request) {

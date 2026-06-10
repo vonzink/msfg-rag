@@ -71,6 +71,7 @@ class AskServiceTest {
 
         PromptBuilderService promptBuilder = mock(PromptBuilderService.class);
         when(promptBuilder.build(anyString(), anyList())).thenReturn("PROMPT");
+        when(promptBuilder.disclaimer()).thenReturn("d");
 
         ModelRouterService router = mock(ModelRouterService.class);
         AiResponse aiResponse = new AiResponse(modelJson, "anthropic", "claude", 10, 10);

@@ -1,5 +1,6 @@
 package com.msfg.rag.service.ai;
 
+import com.msfg.rag.pack.TestPacks;
 import com.msfg.rag.service.retrieval.RetrievedChunk;
 import org.junit.jupiter.api.Test;
 
@@ -11,7 +12,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class PromptBuilderServiceTest {
 
-    private final PromptBuilderService promptBuilder = new PromptBuilderService();
+    private final PromptBuilderService promptBuilder = new PromptBuilderService(TestPacks.msfg());
 
     private RetrievedChunk sampleChunk() {
         return new RetrievedChunk(
@@ -49,7 +50,7 @@ class PromptBuilderServiceTest {
     @Test
     void includesDisclaimer() {
         String prompt = promptBuilder.build("What is DTI?", List.of(sampleChunk()));
-        assertTrue(prompt.contains(PromptBuilderService.DISCLAIMER));
+        assertTrue(prompt.contains(TestPacks.msfg().disclaimer()));
     }
 
     @Test
