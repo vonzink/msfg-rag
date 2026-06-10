@@ -71,7 +71,7 @@ class AskServiceTest {
 
         PromptBuilderService promptBuilder = mock(PromptBuilderService.class);
         when(promptBuilder.build(anyString(), anyList())).thenReturn("PROMPT");
-        when(promptBuilder.disclaimer()).thenReturn("d");
+        when(promptBuilder.disclaimer()).thenReturn("pack-disclaimer");
 
         ModelRouterService router = mock(ModelRouterService.class);
         AiResponse aiResponse = new AiResponse(modelJson, "anthropic", "claude", 10, 10);
@@ -119,6 +119,8 @@ class AskServiceTest {
                 "a model refusal must not be decorated with backfilled citations");
         assertEquals(AskService.NO_SOURCE_ANSWER, response.answer(),
                 "a refusal must return the canned refusal text, never the model's raw refusal");
+        assertEquals("pack-disclaimer", response.disclaimer(),
+                "response disclaimer must come from the pack, not the model echo");
     }
 
     @Test

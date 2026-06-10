@@ -8,6 +8,7 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class PromptBuilderServiceTest {
@@ -57,5 +58,13 @@ class PromptBuilderServiceTest {
     void handlesEmptyContext() {
         String prompt = promptBuilder.build("What is escrow?", List.of());
         assertTrue(prompt.contains("(no source context found)"));
+    }
+
+    @Test
+    void composesTemplateSlotsInOrder() {
+        String prompt = promptBuilder.build("What is escrow?", List.of());
+        String expected = TestPacks.msfg().promptTemplate().formatted(
+                "(no source context found)", "What is escrow?", TestPacks.msfg().disclaimer());
+        assertEquals(expected, prompt);
     }
 }
