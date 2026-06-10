@@ -8,6 +8,7 @@ import com.msfg.rag.provider.AiResponse;
 import com.msfg.rag.repository.AnswerSourceRepository;
 import com.msfg.rag.repository.ConversationRepository;
 import com.msfg.rag.repository.MessageRepository;
+import com.msfg.rag.pack.TestPacks;
 import com.msfg.rag.service.ai.AnswerValidationService;
 import com.msfg.rag.service.ai.ModelAnswer;
 import com.msfg.rag.service.ai.ModelRouterService;
@@ -87,7 +88,7 @@ class AskServiceTest {
         AnswerSourceRepository sources = mock(AnswerSourceRepository.class);
         when(sources.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-        return new AskService(classifier, retrieval, promptBuilder, router,
+        return new AskService(TestPacks.msfg(), classifier, retrieval, promptBuilder, router,
                 new AnswerValidationService(), audit,
                 conversations, messages, sources, new ObjectMapper());
     }
@@ -117,7 +118,7 @@ class AskServiceTest {
         // self-contradictory response (refusal text + 8 citations).
         assertTrue(response.citations().isEmpty(),
                 "a model refusal must not be decorated with backfilled citations");
-        assertEquals(AskService.NO_SOURCE_ANSWER, response.answer(),
+        assertEquals(TestPacks.msfg().guardrails().cannedAnswers().noSource(), response.answer(),
                 "a refusal must return the canned refusal text, never the model's raw refusal");
     }
 

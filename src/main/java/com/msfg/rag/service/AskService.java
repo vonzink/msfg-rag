@@ -2,6 +2,7 @@ package com.msfg.rag.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.msfg.rag.domain.AnswerSource;
+import com.msfg.rag.pack.DomainPack;
 import com.msfg.rag.domain.Conversation;
 import com.msfg.rag.domain.Message;
 import com.msfg.rag.dto.AskRequest;
@@ -42,33 +43,7 @@ public class AskService {
 
     private static final Logger log = LoggerFactory.getLogger(AskService.class);
 
-    public static final String NO_SOURCE_ANSWER =
-            "I could not find enough information in the approved mortgage guidelines to answer "
-            + "that confidently. Please contact a licensed loan officer for review.";
-
-    public static final String ESCALATION_ANSWER =
-            "This question depends on your full loan file and should be reviewed by a licensed "
-            + "loan officer. I can explain the general guideline, but I cannot determine approval "
-            + "or eligibility here.";
-
-    public static final String LEGAL_ANSWER =
-            "I can't provide legal advice. For legal questions about your mortgage or lender, "
-            + "please consult a licensed attorney. I'm happy to explain general mortgage "
-            + "guidelines if that helps.";
-
-    public static final String TAX_ANSWER =
-            "I can't provide tax advice. A licensed tax professional can review your specific "
-            + "situation. I'm happy to explain general mortgage guidelines if that helps.";
-
-    public static final String LIVE_RATES_ANSWER =
-            "I don't have access to live rate data, and rates depend on your full loan scenario. "
-            + "A licensed loan officer at Mountain State Financial Group can provide a current, "
-            + "personalized quote.";
-
-    public static final String FRAUD_ANSWER =
-            "I can't help with that. Misrepresenting income, debts, or documents on a mortgage "
-            + "application is fraud. If you have questions about what must be disclosed, a "
-            + "licensed loan officer can walk you through the requirements.";
+    private final DomainPack.CannedAnswers canned;
 
     private final QuestionClassifierService questionClassifierService;
     private final RetrievalService retrievalService;
@@ -81,7 +56,8 @@ public class AskService {
     private final AnswerSourceRepository answerSourceRepository;
     private final ObjectMapper objectMapper;
 
-    public AskService(QuestionClassifierService questionClassifierService,
+    public AskService(DomainPack pack,
+                      QuestionClassifierService questionClassifierService,
                       RetrievalService retrievalService,
                       PromptBuilderService promptBuilderService,
                       ModelRouterService modelRouterService,
@@ -91,6 +67,7 @@ public class AskService {
                       MessageRepository messageRepository,
                       AnswerSourceRepository answerSourceRepository,
                       ObjectMapper objectMapper) {
+        this.canned = pack.guardrails().cannedAnswers();
         this.questionClassifierService = questionClassifierService;
         this.retrievalService = retrievalService;
         this.promptBuilderService = promptBuilderService;
@@ -113,7 +90,7 @@ public class AskService {
         QuestionCategory category = questionClassifierService.classify(request.question());
         if (category != QuestionCategory.EDUCATIONAL) {
             return refuse(conversation, request, RetrievalResult.empty(),
-                    categoryAnswer(category), null, "classified as " + category);
+                    categoryAnswer(category, canned), null, "classified as " + category);
         }
 
         // 1. Retrieve approved source context.
@@ -121,7 +98,7 @@ public class AskService {
 
         // 2. Refuse early when there is no reliable source material.
         if (!retrieval.sufficientEvidence()) {
-            return refuse(conversation, request, retrieval, NO_SOURCE_ANSWER, null,
+            return refuse(conversation, request, retrieval, canned.noSource(), null,
                     "insufficient evidence");
         }
 
@@ -133,7 +110,7 @@ public class AskService {
         // 4. Parse the model's JSON answer.
         ModelAnswer modelAnswer = parseModelAnswer(routed.response().content());
         if (modelAnswer == null) {
-            return refuse(conversation, request, retrieval, ESCALATION_ANSWER, prompt,
+            return refuse(conversation, request, retrieval, canned.escalation(), prompt,
                     "unparseable model response");
         }
 
@@ -144,7 +121,7 @@ public class AskService {
         //     a cited answer plus an escalation flag is a meaningful response.
         if (Boolean.TRUE.equals(modelAnswer.humanEscalationRequired())
                 && (modelAnswer.citations() == null || modelAnswer.citations().isEmpty())) {
-            return refuse(conversation, request, retrieval, NO_SOURCE_ANSWER, prompt,
+            return refuse(conversation, request, retrieval, canned.noSource(), prompt,
                     "model escalated without citations");
         }
 
@@ -164,7 +141,7 @@ public class AskService {
         var validation = answerValidationService.validate(modelAnswer, true);
         if (!validation.valid()) {
             log.warn("Answer rejected by validator: {}", validation.failureReason());
-            return refuse(conversation, request, retrieval, ESCALATION_ANSWER, prompt,
+            return refuse(conversation, request, retrieval, canned.escalation(), prompt,
                     validation.failureReason());
         }
 
@@ -192,13 +169,13 @@ public class AskService {
 
     // ------------------------------------------------------------------
 
-    private String categoryAnswer(QuestionCategory category) {
+    private String categoryAnswer(QuestionCategory category, DomainPack.CannedAnswers canned) {
         return switch (category) {
-            case ELIGIBILITY -> ESCALATION_ANSWER;
-            case LEGAL -> LEGAL_ANSWER;
-            case TAX -> TAX_ANSWER;
-            case LIVE_RATES -> LIVE_RATES_ANSWER;
-            case FRAUD -> FRAUD_ANSWER;
+            case ELIGIBILITY -> canned.escalation();
+            case LEGAL -> canned.legal();
+            case TAX -> canned.tax();
+            case LIVE_RATES -> canned.liveRates();
+            case FRAUD -> canned.fraud();
             case EDUCATIONAL -> throw new IllegalStateException(
                     "EDUCATIONAL questions must go through the RAG pipeline");
         };
