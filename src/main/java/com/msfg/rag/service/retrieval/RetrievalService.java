@@ -60,12 +60,18 @@ public class RetrievalService {
                 ? config.rerankCandidates()
                 : config.topK() * 2;
 
-        float[] questionEmbedding = embeddingService.embed(question);
+        // Expand mortgage acronyms (PMI -> private mortgage insurance) so terse
+        // acronym questions retrieve the same definitions as their fuller
+        // phrasing. Only the retrieval inputs use the expansion; detectProgram
+        // and the reranker below still operate on the original question.
+        String expandedQuestion = expandQuery(question);
+
+        float[] questionEmbedding = embeddingService.embed(expandedQuestion);
         String vectorLiteral = EmbeddingService.toVectorLiteral(questionEmbedding);
 
         List<ChunkSearchResult> vectorHits = chunkRepository.searchByVector(vectorLiteral, candidatePool);
         List<ChunkSearchResult> keywordHits = chunkRepository.searchByKeyword(
-                toOrQuery(question), candidatePool);
+                toOrQuery(expandedQuestion), candidatePool);
 
         Map<UUID, MutableHit> merged = new HashMap<>();
         for (ChunkSearchResult hit : vectorHits) {
@@ -162,6 +168,58 @@ public class RetrievalService {
             "a", "an", "and", "are", "as", "at", "be", "by", "can", "do", "does",
             "for", "from", "how", "i", "in", "is", "it", "my", "of", "on", "or",
             "the", "to", "use", "used", "we", "what", "when", "which", "will", "with");
+
+    /**
+     * Common mortgage acronyms mapped to their expansions. Terse acronym
+     * questions ("What is PMI?") embed weakly and seldom keyword-match the
+     * definition, so the answer model self-escalates. Appending the expansion
+     * to the retrieval text closes the gap with fuller phrasings without
+     * re-embedding the corpus or touching the stored chunks. Keys are lowercase.
+     */
+    private static final Map<String, String> ACRONYM_EXPANSIONS = Map.ofEntries(
+            Map.entry("pmi", "private mortgage insurance"),
+            Map.entry("mip", "mortgage insurance premium"),
+            Map.entry("dti", "debt-to-income"),
+            Map.entry("ltv", "loan-to-value"),
+            Map.entry("cltv", "combined loan-to-value"),
+            Map.entry("piti", "principal interest taxes insurance"),
+            Map.entry("arm", "adjustable-rate mortgage"),
+            Map.entry("heloc", "home equity line of credit"),
+            Map.entry("hoa", "homeowners association"),
+            Map.entry("apr", "annual percentage rate"),
+            Map.entry("aus", "automated underwriting system"),
+            Map.entry("fha", "Federal Housing Administration"),
+            Map.entry("va", "Veterans Affairs"),
+            Map.entry("usda", "United States Department of Agriculture"));
+
+    /**
+     * Appends expansions for any mortgage acronyms in the question so "What is
+     * PMI?" retrieves the same sources as "What is private mortgage insurance?".
+     * The expanded text feeds both the embedding and the keyword query; the
+     * original question still drives program detection and reranking. Returns
+     * the question unchanged when it contains no known acronym. Matching is
+     * token-based, so an acronym only expands as a standalone word (the "va" in
+     * "available" never triggers).
+     */
+    static String expandQuery(String question) {
+        if (question == null || question.isBlank()) {
+            return question;
+        }
+        String[] tokens = question.toLowerCase(java.util.Locale.US)
+                .replaceAll("[^a-z0-9 ]", " ")
+                .split("\\s+");
+        java.util.LinkedHashSet<String> expansions = new java.util.LinkedHashSet<>();
+        for (String token : tokens) {
+            String expansion = ACRONYM_EXPANSIONS.get(token);
+            if (expansion != null) {
+                expansions.add(expansion);
+            }
+        }
+        if (expansions.isEmpty()) {
+            return question;
+        }
+        return question + " " + String.join(" ", expansions);
+    }
 
     /**
      * Converts a natural-language question into an OR'd tsquery

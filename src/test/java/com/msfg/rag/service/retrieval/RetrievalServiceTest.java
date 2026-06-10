@@ -25,4 +25,36 @@ class RetrievalServiceTest {
         assertFalse(result.contains("-"));
         assertFalse(result.contains("'"));
     }
+
+    @Test
+    void expandsKnownAcronymByAppendingDefinition() {
+        assertEquals("What is PMI? private mortgage insurance",
+                RetrievalService.expandQuery("What is PMI?"));
+    }
+
+    @Test
+    void expandsAcronymRegardlessOfCase() {
+        assertEquals("what is pmi? private mortgage insurance",
+                RetrievalService.expandQuery("what is pmi?"));
+    }
+
+    @Test
+    void expandsMultipleAcronymsInQuestionOrder() {
+        assertEquals("How do DTI and LTV affect approval? debt-to-income loan-to-value",
+                RetrievalService.expandQuery("How do DTI and LTV affect approval?"));
+    }
+
+    @Test
+    void leavesQuestionWithoutAcronymsUnchanged() {
+        assertEquals("What documents are required to close?",
+                RetrievalService.expandQuery("What documents are required to close?"));
+    }
+
+    // The expansion has to survive tokenization so the keyword arm of hybrid
+    // search matches the PMI definition, not just the embedding.
+    @Test
+    void expandedAcronymReachesKeywordQuery() {
+        assertEquals("pmi OR private OR mortgage OR insurance",
+                RetrievalService.toOrQuery(RetrievalService.expandQuery("What is PMI?")));
+    }
 }
