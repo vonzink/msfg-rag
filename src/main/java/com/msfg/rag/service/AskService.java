@@ -137,6 +137,17 @@ public class AskService {
                     "unparseable model response");
         }
 
+        // 4a. A model refusal must surface as one coherent refusal. When the
+        //     model flags escalation AND cites nothing, it did not ground an
+        //     answer — backfilling citations would decorate refusal text with
+        //     sources it never used. Escalations WITH citations pass through:
+        //     a cited answer plus an escalation flag is a meaningful response.
+        if (Boolean.TRUE.equals(modelAnswer.humanEscalationRequired())
+                && (modelAnswer.citations() == null || modelAnswer.citations().isEmpty())) {
+            return refuse(conversation, request, retrieval, NO_SOURCE_ANSWER, prompt,
+                    "model escalated without citations");
+        }
+
         // 4b. Salvage grounded answers that omit citations. The answer model
         //     sometimes returns a correct, grounded answer with no citations
         //     array; attach the approved source chunks rather than discard the
