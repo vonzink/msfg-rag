@@ -40,6 +40,9 @@ dependencies {
     implementation("org.flywaydb:flyway-database-postgresql")
     runtimeOnly("org.postgresql:postgresql")
 
+    // --- Domain pack loading (YAML -> records) ---
+    implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-yaml")
+
     // --- Rate limiting (public endpoint protection) ---
     implementation("com.bucket4j:bucket4j-core:8.10.1")
 
