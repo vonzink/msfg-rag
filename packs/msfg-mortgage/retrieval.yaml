@@ -1,3 +1,8 @@
+# Retrieval tuning. Consumed by: RetrievalService (acronym query expansion,
+# program-aware ranking).
+# Editing rules: acronym keys and program keywords are matched lowercase —
+# keep them lowercase ASCII. word-patterns are Java regex, single-quoted.
+# Every change here must be mirrored in MsfgGoldenPackTest.
 acronyms:
   pmi: private mortgage insurance
   mip: mortgage insurance premium

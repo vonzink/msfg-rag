@@ -1,3 +1,9 @@
+# Compliance guardrails. Consumed by: AnswerValidationService (phrases),
+# AskService (canned answers).
+# Editing rules: phrases are matched lowercase — write them in lowercase ASCII
+# (no smart quotes); phrases containing a colon must be single-quoted.
+# Canned answers are folded (>-): line breaks become single spaces.
+# Every change here must be mirrored in MsfgGoldenPackTest.
 prohibited-phrases:
   - you qualify
   - you are approved

@@ -5,11 +5,15 @@ import java.nio.file.Path;
 /** Loads the real MSFG pack for tests (working dir = repo root under Gradle). */
 public final class TestPacks {
 
-    private static final DomainPack MSFG = new DomainPackLoader().load(Path.of("packs/msfg-mortgage"));
+    private static DomainPack msfg;
 
     private TestPacks() {}
 
-    public static DomainPack msfg() {
-        return MSFG;
+    /** Lazy + memoized: a broken pack fails each test with the loader's own message. */
+    public static synchronized DomainPack msfg() {
+        if (msfg == null) {
+            msfg = new DomainPackLoader().load(Path.of("packs/msfg-mortgage"));
+        }
+        return msfg;
     }
 }

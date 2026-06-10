@@ -1,3 +1,8 @@
+# The locked answer prompt template. Consumed by: PromptBuilderService.
+# Editing rules: block scalar (|) is byte-exact including the trailing newline.
+# Exactly three %s placeholders (context, question, disclaimer) — a literal
+# percent sign must be written %%. Indentation inside the block is preserved.
+# Every change here must be mirrored in MsfgGoldenPackTest.
 template: |
   You are an AI mortgage education assistant for Mountain State Financial Group.
 

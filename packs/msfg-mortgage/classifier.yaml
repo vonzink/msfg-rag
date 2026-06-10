@@ -1,3 +1,8 @@
+# Pre-retrieval question classifier rules. Consumed by: QuestionClassifierService.
+# Rule order IS priority order (first match wins; FRAUD must stay first).
+# Editing rules: patterns are Java regex, matched against the lowercased
+# question — keep them single-quoted; a literal apostrophe is written ''.
+# Every change here must be mirrored in MsfgGoldenPackTest.
 rules:
   - category: FRAUD
     patterns:

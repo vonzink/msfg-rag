@@ -1,3 +1,8 @@
+# Brain identity. Consumed by: DomainPackConfig (slug match), PromptBuilderService
+# (disclaimer), AskService responses.
+# Editing rules: slug must be lowercase [a-z0-9-]. The disclaimer is folded (>-):
+# line breaks become single spaces; keep it one logical sentence block.
+# Every change here must be mirrored in MsfgGoldenPackTest.
 slug: mortgage
 company-name: Mountain State Financial Group
 disclaimer: >-
