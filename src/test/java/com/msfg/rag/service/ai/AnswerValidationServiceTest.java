@@ -4,9 +4,11 @@ import com.msfg.rag.dto.CitationDto;
 import com.msfg.rag.pack.TestPacks;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
 import java.util.List;
+import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -73,5 +75,16 @@ class AnswerValidationServiceTest {
     void rejectsEmptyAnswer() {
         var answer = new ModelAnswer("  ", CITATIONS, 0.9, false, "d");
         assertFalse(validator.validate(answer, true).valid());
+    }
+
+    @ParameterizedTest
+    @MethodSource("allPackPhrases")
+    void rejectsEveryPackProhibitedPhrase(String phrase) {
+        var result = validator.validate(answerWith("Note that " + phrase + " in this case."), true);
+        assertFalse(result.valid(), "pack phrase must be rejected: " + phrase);
+    }
+
+    static Stream<String> allPackPhrases() {
+        return TestPacks.msfg().guardrails().prohibitedPhrases().stream();
     }
 }

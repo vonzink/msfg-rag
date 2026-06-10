@@ -257,4 +257,40 @@ class DomainPackLoaderTest {
                 () -> loader.load(dir));
         assertTrue(ex.getMessage().contains("format string"), ex.getMessage());
     }
+
+    @Test
+    void mixedCaseProhibitedPhraseFailsBoot() throws IOException {
+        Path dir = packCopy();
+        Files.writeString(dir.resolve("guardrails.yaml"), """
+                prohibited-phrases:
+                  - You Are Approved
+                eligible-phrase: you are eligible
+                canned-answers:
+                  no-source: a
+                  escalation: b
+                  legal: c
+                  tax: d
+                  live-rates: e
+                  fraud: f
+                """);
+        var ex = assertThrows(DomainPackLoader.PackValidationException.class,
+                () -> loader.load(dir));
+        assertTrue(ex.getMessage().contains("lowercase"), ex.getMessage());
+    }
+
+    @Test
+    void mixedCaseProgramKeywordFailsBoot() throws IOException {
+        Path dir = packCopy();
+        Files.writeString(dir.resolve("retrieval.yaml"), """
+                acronyms:
+                  pmi: private mortgage insurance
+                programs:
+                  - program: FHA
+                    keywords:
+                      - FHA
+                """);
+        var ex = assertThrows(DomainPackLoader.PackValidationException.class,
+                () -> loader.load(dir));
+        assertTrue(ex.getMessage().contains("lowercase"), ex.getMessage());
+    }
 }
