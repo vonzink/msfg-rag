@@ -34,8 +34,8 @@ public interface DocumentChunkRepository extends JpaRepository<DocumentChunk, UU
                    d.title                                         AS documentTitle,
                    d.effective_date                                AS effectiveDate,
                    1 - (c.embedding <=> CAST(:embedding AS vector)) AS score
-            FROM mortgage_document_chunks c
-            JOIN mortgage_documents d ON d.id = c.document_id
+            FROM brain_document_chunks c
+            JOIN brain_documents d ON d.id = c.document_id
             WHERE d.is_active = TRUE
               AND (d.effective_date IS NULL OR d.effective_date <= CURRENT_DATE)
               AND (d.expiration_date IS NULL OR d.expiration_date >= CURRENT_DATE)
@@ -62,8 +62,8 @@ public interface DocumentChunkRepository extends JpaRepository<DocumentChunk, UU
                    d.title                                         AS documentTitle,
                    d.effective_date                                AS effectiveDate,
                    ts_rank_cd(c.content_tsv, websearch_to_tsquery('english', :query), 32) AS score
-            FROM mortgage_document_chunks c
-            JOIN mortgage_documents d ON d.id = c.document_id
+            FROM brain_document_chunks c
+            JOIN brain_documents d ON d.id = c.document_id
             WHERE d.is_active = TRUE
               AND (d.effective_date IS NULL OR d.effective_date <= CURRENT_DATE)
               AND (d.expiration_date IS NULL OR d.expiration_date >= CURRENT_DATE)
