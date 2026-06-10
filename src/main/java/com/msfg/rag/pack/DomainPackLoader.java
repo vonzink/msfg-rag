@@ -9,6 +9,7 @@ import com.msfg.rag.service.ai.QuestionCategory;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.EnumSet;
 import java.util.IllegalFormatException;
 import java.util.List;
 import java.util.Map;
@@ -137,8 +138,13 @@ public class DomainPackLoader {
 
         require(dir, "classifier.yaml", "rules",
                 p.classifierRules() != null && !p.classifierRules().isEmpty());
+        EnumSet<QuestionCategory> seen = EnumSet.noneOf(QuestionCategory.class);
         for (DomainPack.ClassifierRule rule : p.classifierRules()) {
             require(dir, "classifier.yaml", "rules.category", rule.category() != null);
+            if (!seen.add(rule.category())) {
+                throw new PackValidationException("domain pack " + dir
+                        + ": classifier.yaml: duplicate category " + rule.category());
+            }
             require(dir, "classifier.yaml", "rules.patterns",
                     rule.patterns() != null && !rule.patterns().isEmpty());
             compileAll(dir, "classifier.yaml", rule.patterns());
