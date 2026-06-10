@@ -89,9 +89,9 @@ public class RetrievalService {
                     .keywordScore = normalized;
         }
 
-        String questionProgram = detectProgram(question);
+        java.util.Set<String> questionPrograms = detectPrograms(question);
         List<RetrievedChunk> ranked = merged.values().stream()
-                .map(hit -> toRetrievedChunk(hit, questionProgram))
+                .map(hit -> toRetrievedChunk(hit, questionPrograms))
                 .sorted(Comparator.comparingDouble(RetrievedChunk::combinedScore).reversed())
                 .limit(candidatePool)
                 .toList();
@@ -114,22 +114,19 @@ public class RetrievalService {
         return new RetrievalResult(ranked, confidence, sufficient);
     }
 
-    private RetrievedChunk toRetrievedChunk(MutableHit hit, String questionProgram) {
+    private RetrievedChunk toRetrievedChunk(MutableHit hit, java.util.Set<String> questionPrograms) {
         double combined = config.vectorWeight() * hit.vectorScore
                 + config.keywordWeight() * hit.keywordScore;
 
-        // Program-aware ranking: when the question names a loan program,
-        // boost sources for that program and demote clearly mismatched ones.
-        // Prevents e.g. Fannie Mae's 620 conventional minimum from answering
-        // an FHA credit score question.
-        if (questionProgram != null) {
+        // Program-aware ranking: when the question names loan program(s), boost
+        // sources for any named program and demote clearly mismatched ones.
+        // Prevents e.g. Fannie Mae's 620 conventional minimum from answering an
+        // FHA credit-score question, while still letting a question that names
+        // TWO programs ("FHA vs conventional") retrieve both sides.
+        if (!questionPrograms.isEmpty()) {
             String chunkProgram = detectProgram(
                     hit.source.getSourceName() + " " + hit.source.getDocumentTitle());
-            if (chunkProgram != null) {
-                combined = chunkProgram.equals(questionProgram)
-                        ? Math.min(1.0, combined * 1.2)
-                        : combined * 0.4;
-            }
+            combined = Math.min(1.0, combined * programScoreFactor(questionPrograms, chunkProgram));
         }
 
         String section = null;
@@ -238,28 +235,48 @@ public class RetrievalService {
     }
 
     /**
-     * Detects which loan program a piece of text refers to.
-     * Used for both the user question and source names/titles.
+     * Detects every loan program a piece of text refers to, in priority order
+     * (FHA, VA, USDA, CONVENTIONAL). A comparison question naming two programs
+     * returns both, so neither side is demoted in {@link #toRetrievedChunk}.
      */
-    private static String detectProgram(String text) {
+    static java.util.Set<String> detectPrograms(String text) {
+        java.util.LinkedHashSet<String> programs = new java.util.LinkedHashSet<>();
         if (text == null) {
-            return null;
+            return programs;
         }
         String lower = text.toLowerCase(java.util.Locale.US);
         if (lower.contains("fha") || lower.contains("hud") || lower.contains("4000.1")) {
-            return "FHA";
+            programs.add("FHA");
         }
         if (lower.matches(".*\\bva\\b.*") || lower.contains("veteran")) {
-            return "VA";
+            programs.add("VA");
         }
         if (lower.contains("usda") || lower.contains("rural development")) {
-            return "USDA";
+            programs.add("USDA");
         }
         if (lower.contains("conventional") || lower.contains("fannie")
                 || lower.contains("freddie") || lower.contains("conforming")) {
-            return "CONVENTIONAL";
+            programs.add("CONVENTIONAL");
         }
-        return null;
+        return programs;
+    }
+
+    /** Single highest-priority program for a chunk's source text (null if none). */
+    private static String detectProgram(String text) {
+        return detectPrograms(text).stream().findFirst().orElse(null);
+    }
+
+    /**
+     * Program-match multiplier for a chunk: 1.2 when the chunk's program is one
+     * the question named, 0.4 when the question named program(s) but not this
+     * one, 1.0 when the question named no program or the chunk has none. A
+     * two-program comparison boosts both named programs.
+     */
+    static double programScoreFactor(java.util.Set<String> questionPrograms, String chunkProgram) {
+        if (questionPrograms.isEmpty() || chunkProgram == null) {
+            return 1.0;
+        }
+        return questionPrograms.contains(chunkProgram) ? 1.2 : 0.4;
     }
 
     private static double clamp(Double value) {

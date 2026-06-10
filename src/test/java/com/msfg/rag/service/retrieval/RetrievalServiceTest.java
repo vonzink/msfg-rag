@@ -2,8 +2,11 @@ package com.msfg.rag.service.retrieval;
 
 import org.junit.jupiter.api.Test;
 
+import java.util.Set;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class RetrievalServiceTest {
 
@@ -56,5 +59,45 @@ class RetrievalServiceTest {
     void expandedAcronymReachesKeywordQuery() {
         assertEquals("pmi OR private OR mortgage OR insurance",
                 RetrievalService.toOrQuery(RetrievalService.expandQuery("What is PMI?")));
+    }
+
+    @Test
+    void detectsBothProgramsInAComparisonQuestion() {
+        assertEquals(Set.of("FHA", "CONVENTIONAL"),
+                RetrievalService.detectPrograms("How is an FHA loan different from a conventional loan?"));
+    }
+
+    @Test
+    void detectsSingleProgram() {
+        assertEquals(Set.of("FHA"),
+                RetrievalService.detectPrograms("What is the minimum credit score for an FHA loan?"));
+    }
+
+    @Test
+    void detectsNoProgramWhenNoneNamed() {
+        assertTrue(RetrievalService.detectPrograms("What documents are required to close?").isEmpty());
+    }
+
+    @Test
+    void programFactorBoostsMatchAndDemotesMismatch() {
+        assertEquals(1.2, RetrievalService.programScoreFactor(Set.of("FHA"), "FHA"));
+        assertEquals(0.4, RetrievalService.programScoreFactor(Set.of("FHA"), "CONVENTIONAL"));
+    }
+
+    @Test
+    void programFactorIsNeutralWithoutQuestionProgramOrChunkProgram() {
+        assertEquals(1.0, RetrievalService.programScoreFactor(Set.of(), "FHA"));
+        assertEquals(1.0, RetrievalService.programScoreFactor(Set.of("FHA"), null));
+    }
+
+    // The fix: a comparison question must boost BOTH named programs so neither
+    // side is demoted out of the candidate pool (the bug that made
+    // "FHA vs conventional" return no-source).
+    @Test
+    void comparisonQuestionBoostsEitherNamedProgram() {
+        Set<String> programs = Set.of("FHA", "CONVENTIONAL");
+        assertEquals(1.2, RetrievalService.programScoreFactor(programs, "FHA"));
+        assertEquals(1.2, RetrievalService.programScoreFactor(programs, "CONVENTIONAL"));
+        assertEquals(0.4, RetrievalService.programScoreFactor(programs, "VA"));
     }
 }
