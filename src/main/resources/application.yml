@@ -44,6 +44,11 @@ server:
   port: 8080
   max-http-request-header-size: 16KB
 
+# Which domain pack this deployment runs (see packs/ and the platform spec).
+brain:
+  pack: ${BRAIN_PACK:packs/msfg-mortgage}
+  slug: ${BRAIN_SLUG:mortgage}
+
 management:
   endpoints:
     web:
