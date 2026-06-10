@@ -81,10 +81,10 @@ public class RetrievalService {
                 ? config.rerankCandidates()
                 : config.topK() * 2;
 
-        // Expand mortgage acronyms (PMI -> private mortgage insurance) so terse
-        // acronym questions retrieve the same definitions as their fuller
-        // phrasing. Only the retrieval inputs use the expansion; detectPrograms
-        // and the reranker below still operate on the original question.
+        // Expand acronyms from the domain pack (e.g. a terse acronym question
+        // retrieves the same definitions as its fully spelled-out phrasing).
+        // Only the retrieval inputs use the expansion; program detection and
+        // the reranker below still operate on the original question.
         String expandedQuestion = expandQuery(question, acronyms);
 
         float[] questionEmbedding = embeddingService.embed(expandedQuestion);
@@ -189,13 +189,13 @@ public class RetrievalService {
             "the", "to", "use", "used", "we", "what", "when", "which", "will", "with");
 
     /**
-     * Appends expansions for any mortgage acronyms in the question so "What is
-     * PMI?" retrieves the same sources as "What is private mortgage insurance?".
-     * The expanded text feeds both the embedding and the keyword query; the
-     * original question still drives program detection and reranking. Returns
-     * the question unchanged when it contains no known acronym. Matching is
-     * token-based, so an acronym only expands as a standalone word (the "va" in
-     * "available" never triggers). Expansions come from the domain pack.
+     * Appends expansions for any domain acronyms in the question so a terse
+     * acronym question retrieves the same sources as its fully spelled-out
+     * phrasing. The expanded text feeds both the embedding and the keyword
+     * query; the original question still drives program detection and
+     * reranking. Returns the question unchanged when it contains no known
+     * acronym. Matching is token-based, so an acronym only expands as a
+     * standalone word. Expansions come from the domain pack.
      */
     static String expandQuery(String question, Map<String, String> acronyms) {
         if (question == null || question.isBlank()) {
