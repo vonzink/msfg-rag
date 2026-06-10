@@ -1,5 +1,6 @@
 package com.msfg.rag.pack;
 
+import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.PropertyNamingStrategies;
 import com.fasterxml.jackson.dataformat.yaml.YAMLMapper;
@@ -21,6 +22,7 @@ public class DomainPackLoader {
 
     private final ObjectMapper yaml = YAMLMapper.builder()
             .propertyNamingStrategy(PropertyNamingStrategies.KEBAB_CASE)
+            .enable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
             .build();
 
     // Intermediate per-file shapes (kebab-case keys map to these components).
@@ -31,7 +33,7 @@ public class DomainPackLoader {
     private record ClassifierFile(List<ClassifierRuleFile> rules) {}
     private record ClassifierRuleFile(QuestionCategory category, List<String> patterns) {}
     private record RetrievalFile(Map<String, String> acronyms, List<ProgramFile> programs) {}
-    private record ProgramFile(String program, List<String> contains, List<String> wordPatterns) {}
+    private record ProgramFile(String program, List<String> keywords, List<String> wordPatterns) {}
 
     public DomainPack load(Path packDir) {
         PackFile packFile = read(packDir, "pack.yaml", PackFile.class);
@@ -56,7 +58,7 @@ public class DomainPackLoader {
                 retrievalFile.programs() == null ? null : retrievalFile.programs().stream()
                         .map(p -> new DomainPack.ProgramRule(
                                 p.program(),
-                                p.contains() == null ? List.of() : p.contains(),
+                                p.keywords() == null ? List.of() : p.keywords(),
                                 p.wordPatterns() == null ? List.of() : p.wordPatterns()))
                         .toList());
 
@@ -70,7 +72,12 @@ public class DomainPackLoader {
                     "domain pack " + packDir + ": missing required file " + fileName);
         }
         try {
-            return yaml.readValue(file.toFile(), type);
+            T parsed = yaml.readValue(file.toFile(), type);
+            if (parsed == null) {
+                throw new PackValidationException(
+                        "domain pack " + packDir + ": " + fileName + ": file is empty");
+            }
+            return parsed;
         } catch (IOException e) {
             throw new PackValidationException(
                     "domain pack " + packDir + ": " + fileName + ": " + e.getMessage(), e);

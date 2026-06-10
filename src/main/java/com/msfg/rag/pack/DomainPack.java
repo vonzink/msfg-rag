@@ -22,11 +22,21 @@ public record DomainPack(
         List<ProgramRule> programRules
 ) {
 
+    public DomainPack {
+        classifierRules = classifierRules == null ? null : List.copyOf(classifierRules);
+        acronymExpansions = acronymExpansions == null ? null : Map.copyOf(acronymExpansions);
+        programRules = programRules == null ? null : List.copyOf(programRules);
+    }
+
     public record Guardrails(
             List<String> prohibitedPhrases,
             String eligiblePhrase,
             CannedAnswers cannedAnswers
-    ) {}
+    ) {
+        public Guardrails {
+            prohibitedPhrases = prohibitedPhrases == null ? null : List.copyOf(prohibitedPhrases);
+        }
+    }
 
     /** The six fixed refusal/escalation texts the pipeline can return. */
     public record CannedAnswers(
@@ -39,12 +49,21 @@ public record DomainPack(
     ) {}
 
     /** One classifier category with its regex patterns; list order = check order. */
-    public record ClassifierRule(QuestionCategory category, List<String> patterns) {}
+    public record ClassifierRule(QuestionCategory category, List<String> patterns) {
+        public ClassifierRule {
+            patterns = patterns == null ? null : List.copyOf(patterns);
+        }
+    }
 
     /**
-     * Program detection for program-aware ranking: substring matches plus
+     * Program detection for program-aware ranking: substring keywords plus
      * word-boundary regex patterns (e.g. "\\bva\\b" so "available" never
      * matches VA). List order = priority order.
      */
-    public record ProgramRule(String program, List<String> contains, List<String> wordPatterns) {}
+    public record ProgramRule(String program, List<String> keywords, List<String> wordPatterns) {
+        public ProgramRule {
+            keywords = keywords == null ? null : List.copyOf(keywords);
+            wordPatterns = wordPatterns == null ? null : List.copyOf(wordPatterns);
+        }
+    }
 }

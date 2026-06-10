@@ -2,11 +2,10 @@ acronyms:
   pmi: private mortgage insurance
 programs:
   - program: FHA
-    contains:
+    keywords:
       - fha
-    word-patterns: []
   - program: VA
-    contains:
+    keywords:
       - veteran
     word-patterns:
       - '\bva\b'
