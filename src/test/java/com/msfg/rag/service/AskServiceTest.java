@@ -20,6 +20,8 @@ import com.msfg.rag.service.retrieval.RetrievalResult;
 import com.msfg.rag.service.retrieval.RetrievalService;
 import com.msfg.rag.service.retrieval.RetrievedChunk;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -93,8 +95,54 @@ class AskServiceTest {
                 conversations, messages, sources, new ObjectMapper());
     }
 
+    /** Builds an AskService that classifies every question as {@code category}. */
+    private AskService askServiceClassifying(QuestionCategory category) {
+        QuestionClassifierService classifier = mock(QuestionClassifierService.class);
+        when(classifier.classify(anyString())).thenReturn(category);
+
+        RetrievalService retrieval = mock(RetrievalService.class);
+        when(retrieval.retrieve(anyString())).thenReturn(RetrievalResult.empty());
+
+        PromptBuilderService promptBuilder = mock(PromptBuilderService.class);
+        when(promptBuilder.build(anyString(), anyList())).thenReturn("PROMPT");
+        when(promptBuilder.disclaimer()).thenReturn("pack-disclaimer");
+
+        ModelRouterService router = mock(ModelRouterService.class);
+
+        AuditLogService audit = mock(AuditLogService.class);
+
+        ConversationRepository conversations = mock(ConversationRepository.class);
+        when(conversations.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        MessageRepository messages = mock(MessageRepository.class);
+        when(messages.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        AnswerSourceRepository sources = mock(AnswerSourceRepository.class);
+        when(sources.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        return new AskService(TestPacks.msfg(), classifier, retrieval, promptBuilder, router,
+                new AnswerValidationService(TestPacks.msfg()), audit,
+                conversations, messages, sources, new ObjectMapper());
+    }
+
     private AskRequest pmiQuestion() {
         return new AskRequest(null, "session-1", "What is PMI?", null, null);
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = QuestionCategory.class,
+            names = {"LEGAL", "TAX", "LIVE_RATES", "FRAUD", "ELIGIBILITY"})
+    void categoryRefusalsReturnTheMatchingCannedAnswer(QuestionCategory category) {
+        AskResponse response = askServiceClassifying(category).ask(pmiQuestion());
+        var canned = TestPacks.msfg().guardrails().cannedAnswers();
+        String expected = switch (category) {
+            case LEGAL -> canned.legal();
+            case TAX -> canned.tax();
+            case LIVE_RATES -> canned.liveRates();
+            case FRAUD -> canned.fraud();
+            case ELIGIBILITY -> canned.escalation();
+            case EDUCATIONAL -> throw new IllegalStateException("not a refusal category");
+        };
+        assertEquals(expected, response.answer(), "wrong canned answer for " + category);
+        assertTrue(response.humanEscalationRequired());
     }
 
     @Test
