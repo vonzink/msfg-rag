@@ -4,6 +4,7 @@ import { AuthError, adminKey, api } from "./api";
 import { Stats } from "./types";
 import Corpus from "./screens/Corpus";
 import Settings from "./screens/Settings";
+import Rules from "./screens/Rules";
 import TestConsole from "./screens/TestConsole";
 import Audit from "./screens/Audit";
 
@@ -59,6 +60,7 @@ export default function App() {
           <nav className="nav">
             <NavLink to="/corpus">Corpus</NavLink>
             <NavLink to="/settings">Settings</NavLink>
+            <NavLink to="/rules">Rules</NavLink>
             <NavLink to="/console">Test console</NavLink>
             <NavLink to="/audit">Audit</NavLink>
           </nav>
@@ -71,6 +73,7 @@ export default function App() {
             <Route path="/corpus" element={<Corpus stats={stats} onCorpusChanged={() =>
               api.get<Stats>("/api/ai/admin/stats").then(setStats).catch(() => undefined)} />} />
             <Route path="/settings" element={<Settings />} />
+            <Route path="/rules" element={<Rules />} />
             <Route path="/console" element={<TestConsole slug={stats?.brain.slug ?? "mortgage"} />} />
             <Route path="/audit" element={<Audit />} />
             <Route path="*" element={<Navigate to="/corpus" replace />} />

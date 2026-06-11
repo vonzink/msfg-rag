@@ -33,7 +33,7 @@ public class RulesService {
 
     private static final long CACHE_TTL_NANOS = 10_000_000_000L; // ~10 s
     private static final int  CONTENT_MAX_CHARS = 20_000;
-    static final Set<String>  KEYS = Set.of("rules.hard", "rules.guidance");
+    public static final Set<String>  KEYS = Set.of("rules.hard", "rules.guidance");
 
     // ── dependencies ──────────────────────────────────────────────────────────
 

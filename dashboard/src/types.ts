@@ -45,3 +45,13 @@ export interface AuditDetail extends AuditRow {
   rewrittenQuestion: string | null; answer: string | null;
   sources: Record<string, unknown>[];
 }
+
+export interface RuleState {
+  key: string; content: string; source: "pack" | "custom";
+  updatedAt: string | null; updatedBy: string | null;
+}
+export interface RulesResponse { hard: RuleState; guidance: RuleState }
+export interface RuleRevisionDto {
+  revision: number; createdAt: string; createdBy: string;
+  reverted: boolean; content: string | null;
+}

@@ -16,7 +16,6 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 /**
  * Admin endpoints for viewing and editing the two owner-editable rule blocks
@@ -34,7 +33,6 @@ public class AdminRulesController {
     public record ContentBody(String content) {}
 
     private static final String UPDATED_BY = "admin-api";
-    private static final Set<String> VALID_KEYS = Set.of("rules.hard", "rules.guidance");
 
     private final RulesService rulesService;
     private final PromptBuilderService promptBuilder;
@@ -132,7 +130,7 @@ public class AdminRulesController {
     @GetMapping("/preview")
     public Map<String, String> preview() {
         String prompt = promptBuilder.build(
-                "What are the current rules and guidance in effect?", List.of());
+                "<your question here>", List.of());
         return Map.of("prompt", prompt);
     }
 
@@ -149,9 +147,9 @@ public class AdminRulesController {
     }
 
     private void requireKnownKey(String key) {
-        if (!VALID_KEYS.contains(key)) {
+        if (!RulesService.KEYS.contains(key)) {
             throw new IllegalArgumentException(
-                    "Unknown rule key: " + key + ". Must be one of " + VALID_KEYS);
+                    "Unknown rule key: " + key + ". Must be one of " + RulesService.KEYS);
         }
     }
 }
