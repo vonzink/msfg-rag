@@ -16,10 +16,14 @@ import java.util.List;
 public class PromptBuilderService {
 
     private final String template;
+    private final String hardRules;
+    private final String guidance;
     private final String disclaimer;
 
     public PromptBuilderService(DomainPack pack) {
         this.template = pack.promptTemplate();
+        this.hardRules = pack.hardRules();
+        this.guidance = pack.guidance();
         this.disclaimer = pack.disclaimer();
     }
 
@@ -29,7 +33,7 @@ public class PromptBuilderService {
     }
 
     public String build(String question, List<RetrievedChunk> chunks) {
-        return template.formatted(formatContext(chunks), question, disclaimer);
+        return template.formatted(hardRules, guidance, formatContext(chunks), question, disclaimer);
     }
 
     /**

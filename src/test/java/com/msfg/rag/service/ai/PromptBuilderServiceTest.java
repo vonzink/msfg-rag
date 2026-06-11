@@ -64,7 +64,11 @@ class PromptBuilderServiceTest {
     void composesTemplateSlotsInOrder() {
         String prompt = promptBuilder.build("What is escrow?", List.of());
         String expected = TestPacks.msfg().promptTemplate().formatted(
-                "(no source context found)", "What is escrow?", TestPacks.msfg().disclaimer());
+                TestPacks.msfg().hardRules(),
+                TestPacks.msfg().guidance(),
+                "(no source context found)",
+                "What is escrow?",
+                TestPacks.msfg().disclaimer());
         assertEquals(expected, prompt);
     }
 }
