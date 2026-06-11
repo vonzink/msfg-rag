@@ -48,6 +48,19 @@ server:
 brain:
   pack: ${BRAIN_PACK:packs/msfg-mortgage}
   slug: ${BRAIN_SLUG:mortgage}
+  providers:
+    deepseek:
+      api-key: ${DEEPSEEK_API_KEY:}
+      base-url: ${DEEPSEEK_BASE_URL:https://api.deepseek.com}
+      model: ${DEEPSEEK_MODEL:deepseek-v4-flash}
+    gemini:
+      api-key: ${GEMINI_API_KEY:}
+      base-url: ${GEMINI_BASE_URL:https://generativelanguage.googleapis.com/v1beta/openai}
+      model: ${GEMINI_MODEL:gemini-2.5-flash}
+    grok:
+      api-key: ${GROK_API_KEY:}
+      base-url: ${GROK_BASE_URL:https://api.x.ai/v1}
+      model: ${GROK_MODEL:grok-4.3}
   corpus:
     bucket: ${S3_BUCKET:msfg.us}
     prefix: ${S3_PREFIX:rag-brain/}
