@@ -3,6 +3,7 @@ package com.msfg.rag.service.ingestion;
 import com.msfg.rag.domain.DocumentChunk;
 import com.msfg.rag.domain.MortgageDocument;
 import com.msfg.rag.domain.SourceType;
+import com.msfg.rag.service.sync.Sha256;
 import com.msfg.rag.repository.DocumentChunkRepository;
 import com.msfg.rag.repository.MortgageDocumentRepository;
 import com.msfg.rag.service.storage.StorageService;
@@ -77,6 +78,7 @@ public class DocumentIngestionService {
         document.setFileName(fileName);
         document.setS3Key(storageKey);
         document.setDocumentVersion(documentVersion);
+        document.setContentSha256(Sha256.hex(fileBytes));
         document.setEffectiveDate(effectiveDate);
         document.setExpirationDate(expirationDate);
         document = documentRepository.save(document);

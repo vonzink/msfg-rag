@@ -7,6 +7,8 @@ import com.msfg.rag.repository.MortgageDocumentRepository;
 import com.msfg.rag.service.ingestion.DocumentIngestionService;
 import com.msfg.rag.service.retrieval.RetrievalResult;
 import com.msfg.rag.service.retrieval.RetrievalService;
+import com.msfg.rag.service.sync.SyncReport;
+import com.msfg.rag.service.sync.SyncService;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -39,13 +41,16 @@ public class DocumentAdminController {
     private final DocumentIngestionService ingestionService;
     private final MortgageDocumentRepository documentRepository;
     private final RetrievalService retrievalService;
+    private final SyncService syncService;
 
     public DocumentAdminController(DocumentIngestionService ingestionService,
                                    MortgageDocumentRepository documentRepository,
-                                   RetrievalService retrievalService) {
+                                   RetrievalService retrievalService,
+                                   SyncService syncService) {
         this.ingestionService = ingestionService;
         this.documentRepository = documentRepository;
         this.retrievalService = retrievalService;
+        this.syncService = syncService;
     }
 
     @PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
@@ -94,6 +99,15 @@ public class DocumentAdminController {
     @PostMapping("/{id}/deactivate")
     public ResponseEntity<DocumentDto> deactivate(@PathVariable UUID id) {
         return setActive(id, false);
+    }
+
+    /**
+     * Sync the S3 corpus into the brain (dashboard "Sync now"). dryRun=true
+     * returns the plan without changing anything.
+     */
+    @PostMapping("/sync")
+    public SyncReport sync(@RequestParam(value = "dryRun", defaultValue = "false") boolean dryRun) {
+        return syncService.sync(dryRun);
     }
 
     /**

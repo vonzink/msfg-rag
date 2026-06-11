@@ -48,6 +48,10 @@ server:
 brain:
   pack: ${BRAIN_PACK:packs/msfg-mortgage}
   slug: ${BRAIN_SLUG:mortgage}
+  corpus:
+    bucket: ${S3_BUCKET:msfg.us}
+    prefix: ${S3_PREFIX:rag-brain/}
+    region: ${AWS_REGION:us-west-1}
 
 management:
   endpoints:
