@@ -45,6 +45,9 @@ public class MortgageDocument {
     @Column(name = "document_version", length = 50)
     private String documentVersion;
 
+    @Column(name = "content_sha256", length = 64)
+    private String contentSha256;
+
     @Column(name = "effective_date")
     private LocalDate effectiveDate;
 
@@ -92,6 +95,9 @@ public class MortgageDocument {
 
     public String getDocumentVersion() { return documentVersion; }
     public void setDocumentVersion(String documentVersion) { this.documentVersion = documentVersion; }
+
+    public String getContentSha256() { return contentSha256; }
+    public void setContentSha256(String contentSha256) { this.contentSha256 = contentSha256; }
 
     public LocalDate getEffectiveDate() { return effectiveDate; }
     public void setEffectiveDate(LocalDate effectiveDate) { this.effectiveDate = effectiveDate; }
