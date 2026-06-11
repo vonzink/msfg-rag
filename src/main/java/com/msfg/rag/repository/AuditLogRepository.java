@@ -4,6 +4,8 @@ import com.msfg.rag.domain.AuditLog;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.UUID;
@@ -13,4 +15,31 @@ public interface AuditLogRepository extends JpaRepository<AuditLog, UUID> {
 
     /** Admin review queue: answers flagged for human follow-up. */
     Page<AuditLog> findByHumanEscalationRequiredTrueOrderByCreatedAtDesc(Pageable pageable);
+
+    /**
+     * Dashboard search (no substring filter): newest first, optionally escalated-only.
+     * Used when q is null/blank. Split from the q-variant to avoid Postgres null-typing
+     * issues with LOWER() on an untyped NULL parameter.
+     */
+    @Query("""
+            SELECT a FROM AuditLog a
+            WHERE (:escalatedOnly = false OR a.humanEscalationRequired = true)
+            ORDER BY a.createdAt DESC
+            """)
+    Page<AuditLog> search(@Param("escalatedOnly") boolean escalatedOnly,
+                          Pageable pageable);
+
+    /**
+     * Dashboard search with substring filter: newest first, optionally escalated-only,
+     * question-substring (case-insensitive). Used when q is non-blank.
+     */
+    @Query("""
+            SELECT a FROM AuditLog a
+            WHERE (:escalatedOnly = false OR a.humanEscalationRequired = true)
+              AND LOWER(a.userQuestion) LIKE LOWER(CONCAT('%', :q, '%'))
+            ORDER BY a.createdAt DESC
+            """)
+    Page<AuditLog> search(@Param("escalatedOnly") boolean escalatedOnly,
+                          @Param("q") String q,
+                          Pageable pageable);
 }

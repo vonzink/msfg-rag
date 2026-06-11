@@ -22,6 +22,18 @@ class CorsConfigTest {
     }
 
     @Test
+    void exposesAdminSurfacesForTheDashboard() {
+        Map<String, CorsConfiguration> mappings = register("mortgage");
+
+        assertTrue(mappings.containsKey("/api/ai/admin/**"),
+                "dashboard origins must reach the admin API");
+        assertTrue(mappings.containsKey("/api/ai/documents/**"),
+                "dashboard origins must reach the documents API");
+        assertTrue(mappings.get("/api/ai/admin/**").getAllowedHeaders()
+                .contains("X-Admin-Api-Key"), "the admin key header must be allowed");
+    }
+
+    @Test
     void followsTheConfiguredSlug() {
         Map<String, CorsConfiguration> mappings = register("roofing");
 

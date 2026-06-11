@@ -11,4 +11,6 @@ import java.util.UUID;
 public interface MortgageDocumentRepository extends JpaRepository<MortgageDocument, UUID> {
 
     List<MortgageDocument> findByActiveTrue();
+
+    long countByActiveTrue();
 }

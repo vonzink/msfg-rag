@@ -33,6 +33,14 @@ class AdminApiKeyFilterTest {
                 "encoded documents path must still be gated");
     }
 
+    @Test
+    void preflightOptionsAreNeverGated() {
+        MockHttpServletRequest preflight = new MockHttpServletRequest("OPTIONS", "/api/ai/admin/settings");
+        preflight.setRequestURI("/api/ai/admin/settings");
+        assertTrue(filter.shouldNotFilter(preflight),
+                "browsers cannot send the admin key on preflight");
+    }
+
     private MockHttpServletRequest get(String uri) {
         MockHttpServletRequest request = new MockHttpServletRequest("GET", uri);
         request.setRequestURI(uri);

@@ -42,6 +42,15 @@ class RateLimitFilterTest {
                 "the old path is not limited when the slug changes");
     }
 
+    @Test
+    void preflightOptionsAreNotRateLimited() {
+        RateLimitFilter filter = new RateLimitFilter(props, "mortgage");
+        MockHttpServletRequest preflight = new MockHttpServletRequest("OPTIONS", "/api/ai/mortgage/ask");
+        preflight.setRequestURI("/api/ai/mortgage/ask");
+        assertTrue(filter.shouldNotFilter(preflight),
+                "preflights must not consume rate budget");
+    }
+
     private MockHttpServletRequest get(String uri) {
         MockHttpServletRequest request = new MockHttpServletRequest("POST", uri);
         request.setRequestURI(uri);
