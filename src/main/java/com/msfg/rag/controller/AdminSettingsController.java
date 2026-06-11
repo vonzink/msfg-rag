@@ -78,6 +78,9 @@ public class AdminSettingsController {
             throw new IllegalArgumentException("Unknown provider '" + v
                     + "'. Registered: " + router.providerNames());
         }
+        if (MODEL_KEYS.contains(key) && v.length() > 200) {
+            throw new IllegalArgumentException(key + " must be 200 characters or fewer");
+        }
         if (THRESHOLD_KEY.equals(key)) {
             double d = parseDouble(key, v);
             if (d < 0.0 || d > 1.0) {

@@ -44,6 +44,12 @@ public class ModelRouterService {
                     "Default AI provider '" + routing.defaultProvider() + "' is not registered. "
                     + "Available: " + providers.keySet());
         }
+        String fallback = routing.fallbackProvider();
+        if (fallback != null && !fallback.isBlank() && !providers.containsKey(fallback)) {
+            throw new IllegalStateException(
+                    "Fallback AI provider '" + fallback + "' is not registered. "
+                    + "Available: " + providers.keySet());
+        }
     }
 
     /**

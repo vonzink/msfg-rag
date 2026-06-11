@@ -93,6 +93,19 @@ class ModelRouterServiceTest {
                 s));
     }
 
+    @Test
+    void rejectsUnknownFallbackProviderAtStartup() {
+        RuntimeSettings s = mock(RuntimeSettings.class);
+        when(s.answerProvider()).thenReturn("anthropic");
+        when(s.answerModel()).thenReturn(null);
+        when(s.utilityProvider()).thenReturn("anthropic");
+        when(s.utilityModel()).thenReturn(null);
+        assertThrows(IllegalStateException.class, () -> new ModelRouterService(
+                List.of(capturingProvider("anthropic")),
+                properties("anthropic", "bogus"),
+                s));
+    }
+
     // ------------------------------------------------------------------
     // New tests (Task 4.1)
 

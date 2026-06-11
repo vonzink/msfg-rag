@@ -52,8 +52,17 @@ public class RuntimeSettings {
         return raw("utility.provider", answerProvider());
     }
 
+    /**
+     * Null = use the resolved provider's own default model. Inherits the
+     * answer model only when the utility lane runs on the same provider —
+     * a model name must never cross providers.
+     */
     public String utilityModel() {
-        return raw("utility.model", answerModel());
+        String explicit = raw("utility.model", null);
+        if (explicit != null) {
+            return explicit;
+        }
+        return utilityProvider().equals(answerProvider()) ? answerModel() : null;
     }
 
     public double confidenceThreshold() {

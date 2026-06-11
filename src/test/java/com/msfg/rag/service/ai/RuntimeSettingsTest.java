@@ -123,4 +123,17 @@ class RuntimeSettingsTest {
         RuntimeSettings s = settings();
         assertEquals(java.util.Map.of("answer.model", "m"), s.overrides());
     }
+
+    @Test
+    void utilityModelDoesNotCrossProviders() {
+        when(repository.findAll()).thenReturn(List.of(
+                new BrainSetting("answer.model", "claude-haiku-4-5", "t"),
+                new BrainSetting("utility.provider", "openai", "t")));
+        RuntimeSettings s = settings();
+
+        assertEquals("claude-haiku-4-5", s.answerModel());
+        assertEquals("openai", s.utilityProvider());
+        assertNull(s.utilityModel(),
+                "an answer-lane model name must never be inherited across providers");
+    }
 }

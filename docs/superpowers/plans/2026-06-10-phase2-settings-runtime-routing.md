@@ -292,6 +292,9 @@ class RuntimeSettingsTest {
 ```
 
 - [ ] **2.2** Run the class → compile failure. Then implement `RuntimeSettings.java`:
+
+> **CORRECTION (found during implementation):** the `snapshot()` condition below contains an overflow bug — `now - Long.MIN_VALUE` wraps negative, so the cache would never load. The implemented code adds a sentinel check: `if (cachedAtNanos == Long.MIN_VALUE || now - cachedAtNanos > CACHE_TTL_NANOS)`. Do not copy this block without that fix (see commit 44ff87d).
+
 ```java
 package com.msfg.rag.service.ai;
 

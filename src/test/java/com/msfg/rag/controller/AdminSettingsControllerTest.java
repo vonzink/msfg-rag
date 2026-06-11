@@ -61,6 +61,8 @@ class AdminSettingsControllerTest {
                 () -> controller.put(Map.of("retrieval.confidence-threshold", "1.5")));
         assertThrows(IllegalArgumentException.class,
                 () -> controller.put(Map.of("rerank.enabled", "maybe")));
+        assertThrows(IllegalArgumentException.class,
+                () -> controller.put(Map.of("answer.model", "x".repeat(201))));
     }
 
     @Test
