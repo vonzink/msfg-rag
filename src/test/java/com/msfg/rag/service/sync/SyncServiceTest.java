@@ -7,10 +7,12 @@ import com.msfg.rag.service.ingestion.DocumentIngestionService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.InOrder;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
@@ -199,30 +201,29 @@ class SyncServiceTest {
 
     @Test
     void reactivateAndDeactivateTogglesActive() {
-        byte[] pdfBytes = "PDF".getBytes();
-
         MortgageDocument inactive = new MortgageDocument();
         inactive.setFileName("old.pdf");
         inactive.setActive(false);
+        ReflectionTestUtils.setField(inactive, "id", UUID.randomUUID());
 
         MortgageDocument active = new MortgageDocument();
         active.setFileName("gone.pdf");
         active.setActive(true);
+        ReflectionTestUtils.setField(active, "id", UUID.randomUUID());
 
-        when(corpusSource.fetchManifest()).thenReturn(EMPTY_MANIFEST);
+        when(corpusSource.fetchManifest()).thenReturn(Optional.empty());
         when(corpusSource.listFiles()).thenReturn(List.of("old.pdf"));
-        when(corpusSource.fetch("old.pdf")).thenReturn(pdfBytes);
+        when(corpusSource.fetch("old.pdf")).thenReturn("PDF".getBytes());
         when(documentRepository.findAll()).thenReturn(List.of(inactive, active));
+        when(documentRepository.findById(inactive.getId())).thenReturn(Optional.of(inactive));
+        when(documentRepository.findById(active.getId())).thenReturn(Optional.of(active));
 
-        // Verify plan types via dry-run (avoids UUID-null findById issues in test)
-        SyncReport report = syncService.sync(true);
+        syncService.sync(false);
 
-        long reactivateCount = report.results().stream()
-                .filter(r -> r.action().equals("REACTIVATE")).count();
-        long deactivateCount = report.results().stream()
-                .filter(r -> r.action().equals("DEACTIVATE")).count();
-        assertEquals(1, reactivateCount, "expected 1 REACTIVATE");
-        assertEquals(1, deactivateCount, "expected 1 DEACTIVATE");
+        assertTrue(inactive.isActive(), "REACTIVATE must set active=true");
+        assertFalse(active.isActive(), "DEACTIVATE must set active=false");
+        verify(documentRepository).save(inactive);
+        verify(documentRepository).save(active);
     }
 
     // -------------------------------------------------------------------------
