@@ -185,7 +185,7 @@ body {
 .tbl tr.detail-row td { background: #f9fafb; padding: 12px 16px; }
 
 .row-actions { display: flex; gap: 6px; }
-.row-actions button { padding: 4px 8px; font-size: 12px; }
+.row-actions button { padding: 4px 8px; font-size: 12px; height: auto; }
 
 /* Buttons */
 button {
