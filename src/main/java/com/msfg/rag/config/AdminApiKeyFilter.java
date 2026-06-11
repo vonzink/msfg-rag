@@ -28,9 +28,10 @@ public class AdminApiKeyFilter extends OncePerRequestFilter {
     }
 
     @Override
-    protected boolean shouldNotFilter(HttpServletRequest request) {
+    public boolean shouldNotFilter(HttpServletRequest request) {
         // Only admin surfaces are gated; /ask and conversation reads are public.
-        return !request.getRequestURI().startsWith("/api/ai/documents");
+        String uri = request.getRequestURI();
+        return !(uri.startsWith("/api/ai/documents") || uri.startsWith("/api/ai/admin"));
     }
 
     @Override

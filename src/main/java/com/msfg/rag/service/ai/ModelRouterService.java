@@ -79,7 +79,7 @@ public class ModelRouterService {
     }
 
     public Set<String> providerNames() {
-        return providers.keySet();
+        return java.util.Set.copyOf(providers.keySet());
     }
 
     public record RoutedResponse(AiResponse response, boolean fallbackUsed) {
