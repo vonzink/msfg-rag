@@ -1,12 +1,16 @@
 package com.msfg.rag.pack;
 
+import com.msfg.rag.service.ai.PromptBuilderService;
 import com.msfg.rag.service.ai.QuestionCategory;
+import com.msfg.rag.service.ai.RulesService;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 /**
  * Golden regression lock for the MSFG domain pack.
@@ -203,6 +207,28 @@ class MsfgGoldenPackTest {
                 "\\brate (quote|lock)\\b.*\\b(today|now|get)\\b",
                 "\\bwhat rate\\b.*\\b(get|offer|give)\\b"
         ), rules.get(4).patterns());
+    }
+
+    @Test
+    void defaultAssemblyIsByteExact() {
+        RulesService rulesService = mock(RulesService.class);
+        when(rulesService.effectiveHard()).thenReturn(PACK.hardRules());
+        when(rulesService.effectiveGuidance()).thenReturn(PACK.guidance());
+
+        String assembled = new PromptBuilderService(PACK, rulesService).build("Q", List.of());
+
+        String expected = PACK.promptTemplate().formatted(
+                PACK.hardRules(),
+                PACK.guidance(),
+                "(no source context found)",
+                "Q",
+                PACK.disclaimer());
+        assertEquals(expected, assembled);
+
+        // Assembly-mechanics anchors — byte-exact
+        assertTrue(assembled.contains("Hard rules — follow these without exception:"));
+        assertTrue(assembled.contains("Guidance — strong recommendations:"));
+        assertTrue(assembled.contains("\"human_escalation_required\": false"));
     }
 
     @Test

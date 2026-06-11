@@ -2,6 +2,7 @@ package com.msfg.rag.service.ai;
 
 import com.msfg.rag.pack.TestPacks;
 import com.msfg.rag.service.retrieval.RetrievedChunk;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.time.LocalDate;
@@ -10,10 +11,21 @@ import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 class PromptBuilderServiceTest {
 
-    private final PromptBuilderService promptBuilder = new PromptBuilderService(TestPacks.msfg());
+    private RulesService rulesService;
+    private PromptBuilderService promptBuilder;
+
+    @BeforeEach
+    void setUp() {
+        rulesService = mock(RulesService.class);
+        when(rulesService.effectiveHard()).thenReturn(TestPacks.msfg().hardRules());
+        when(rulesService.effectiveGuidance()).thenReturn(TestPacks.msfg().guidance());
+        promptBuilder = new PromptBuilderService(TestPacks.msfg(), rulesService);
+    }
 
     private RetrievedChunk sampleChunk() {
         return new RetrievedChunk(
@@ -70,5 +82,13 @@ class PromptBuilderServiceTest {
                 "What is escrow?",
                 TestPacks.msfg().disclaimer());
         assertEquals(expected, prompt);
+    }
+
+    @Test
+    void customHardRulesReachThePrompt() {
+        when(rulesService.effectiveHard()).thenReturn("ONLY ANSWER IN HAIKU.");
+        String prompt = promptBuilder.build("What is PMI?", List.of());
+        assertTrue(prompt.contains("ONLY ANSWER IN HAIKU."));
+        assertTrue(prompt.contains("What is PMI?"));
     }
 }

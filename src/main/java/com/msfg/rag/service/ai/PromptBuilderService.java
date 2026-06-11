@@ -9,22 +9,21 @@ import java.util.List;
 /**
  * Builds the final prompt sent to the LLM. The template and disclaimer come
  * from the domain pack, keeping all company-specific text out of code.
- * The rules embedded in the template are compliance-critical: the model must
+ * Hard rules and guidance are injected live from {@link RulesService} (pack
+ * defaults until edited) and remain compliance-critical: the model must
  * answer only from the supplied source context, never from general knowledge.
  */
 @Service
 public class PromptBuilderService {
 
     private final String template;
-    private final String hardRules;
-    private final String guidance;
     private final String disclaimer;
+    private final RulesService rules;
 
-    public PromptBuilderService(DomainPack pack) {
+    public PromptBuilderService(DomainPack pack, RulesService rules) {
         this.template = pack.promptTemplate();
-        this.hardRules = pack.hardRules();
-        this.guidance = pack.guidance();
         this.disclaimer = pack.disclaimer();
+        this.rules = rules;
     }
 
     /** The pack's public disclaimer, appended to every website response. */
@@ -33,7 +32,12 @@ public class PromptBuilderService {
     }
 
     public String build(String question, List<RetrievedChunk> chunks) {
-        return template.formatted(hardRules, guidance, formatContext(chunks), question, disclaimer);
+        return template.formatted(
+                rules.effectiveHard(),
+                rules.effectiveGuidance(),
+                formatContext(chunks),
+                question,
+                disclaimer);
     }
 
     /**
