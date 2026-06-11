@@ -27,6 +27,13 @@ class RateLimitFilterTest {
     }
 
     @Test
+    void percentEncodedAskPathIsStillRateLimited() {
+        RateLimitFilter filter = new RateLimitFilter(props, "mortgage");
+        assertFalse(filter.shouldNotFilter(get("/api/ai/mortgage/%61sk")),
+                "encoded ask path must not bypass rate limiting");
+    }
+
+    @Test
     void followsTheConfiguredSlug() {
         RateLimitFilter filter = new RateLimitFilter(props, "roofing");
 

@@ -10,6 +10,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
+import org.springframework.web.util.UrlPathHelper;
 
 import java.io.IOException;
 import java.time.Duration;
@@ -27,6 +28,7 @@ import java.util.concurrent.ConcurrentHashMap;
 public class RateLimitFilter extends OncePerRequestFilter {
 
     private static final int MAX_TRACKED_CLIENTS = 100_000;
+    private static final UrlPathHelper PATH_HELPER = new UrlPathHelper();
 
     private final Map<String, Bucket> buckets = new ConcurrentHashMap<>();
     private final int requestsPerMinute;
@@ -40,7 +42,8 @@ public class RateLimitFilter extends OncePerRequestFilter {
 
     @Override
     public boolean shouldNotFilter(HttpServletRequest request) {
-        return !request.getRequestURI().equals(askPath);
+        // Decoded path — percent-encoding must not bypass rate limiting.
+        return !PATH_HELPER.getPathWithinApplication(request).equals(askPath);
     }
 
     @Override

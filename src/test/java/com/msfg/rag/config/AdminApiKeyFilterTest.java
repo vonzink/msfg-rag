@@ -24,6 +24,15 @@ class AdminApiKeyFilterTest {
         assertTrue(filter.shouldNotFilter(get("/api/ai/conversations/abc")));
     }
 
+    @Test
+    void percentEncodedPathsCannotBypassTheGate() {
+        // %61 = 'a' — Spring decodes and routes these to the gated controllers.
+        assertFalse(filter.shouldNotFilter(get("/api/ai/%61dmin/settings")),
+                "encoded admin path must still be gated");
+        assertFalse(filter.shouldNotFilter(get("/api/ai/%64ocuments")),
+                "encoded documents path must still be gated");
+    }
+
     private MockHttpServletRequest get(String uri) {
         MockHttpServletRequest request = new MockHttpServletRequest("GET", uri);
         request.setRequestURI(uri);

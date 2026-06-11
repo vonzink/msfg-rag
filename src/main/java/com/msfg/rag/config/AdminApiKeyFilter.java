@@ -7,6 +7,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
+import org.springframework.web.util.UrlPathHelper;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -20,6 +21,7 @@ import java.security.MessageDigest;
 public class AdminApiKeyFilter extends OncePerRequestFilter {
 
     private static final String HEADER = "X-Admin-Api-Key";
+    private static final UrlPathHelper PATH_HELPER = new UrlPathHelper();
 
     private final String adminApiKey;
 
@@ -30,8 +32,10 @@ public class AdminApiKeyFilter extends OncePerRequestFilter {
     @Override
     public boolean shouldNotFilter(HttpServletRequest request) {
         // Only admin surfaces are gated; /ask and conversation reads are public.
-        String uri = request.getRequestURI();
-        return !(uri.startsWith("/api/ai/documents") || uri.startsWith("/api/ai/admin"));
+        // Compare the DECODED path (what Spring routes on), never the raw
+        // request URI — percent-encoding a letter must not skip the gate.
+        String path = PATH_HELPER.getPathWithinApplication(request);
+        return !(path.startsWith("/api/ai/documents") || path.startsWith("/api/ai/admin"));
     }
 
     @Override
