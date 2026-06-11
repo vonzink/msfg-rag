@@ -67,7 +67,7 @@ public class RerankerService {
         try {
             String prompt = PROMPT_TEMPLATE.formatted(question, formatExcerpts(candidates));
             String response = modelRouterService
-                    .generate(new AiRequest(prompt, 0.0, 800))
+                    .generate(AiRequest.forUtility(prompt, 0.0, 800))
                     .response().content();
 
             double[] scores = parseScores(response, candidates.size());
