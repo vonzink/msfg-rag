@@ -24,8 +24,9 @@ public class OpenAiProvider implements AiModelProvider {
 
     @Override
     public AiResponse generate(AiRequest request) {
+        String model = request.model() != null ? request.model() : modelName;
         Prompt prompt = new Prompt(request.prompt(), OpenAiChatOptions.builder()
-                .model(modelName)
+                .model(model)
                 .temperature(request.temperature())
                 .maxTokens(request.maxTokens())
                 .build());
@@ -42,7 +43,7 @@ public class OpenAiProvider implements AiModelProvider {
         return new AiResponse(
                 response.getResult().getOutput().getText(),
                 getProviderName(),
-                modelName,
+                model,
                 promptTokens,
                 completionTokens
         );

@@ -6,6 +6,7 @@ import com.msfg.rag.config.RagProperties;
 import com.msfg.rag.pack.DomainPack;
 import com.msfg.rag.repository.ChunkSearchResult;
 import com.msfg.rag.repository.DocumentChunkRepository;
+import com.msfg.rag.service.ai.RuntimeSettings;
 import com.msfg.rag.service.ingestion.EmbeddingService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -41,6 +42,7 @@ public class RetrievalService {
     private final RerankerService rerankerService;
     private final ObjectMapper objectMapper;
     private final RagProperties.Retrieval config;
+    private final RuntimeSettings settings;
     private final Map<String, String> acronyms;
     private final List<CompiledProgram> programs;
 
@@ -49,12 +51,14 @@ public class RetrievalService {
                             RerankerService rerankerService,
                             ObjectMapper objectMapper,
                             RagProperties properties,
-                            DomainPack pack) {
+                            DomainPack pack,
+                            RuntimeSettings settings) {
         this.chunkRepository = chunkRepository;
         this.embeddingService = embeddingService;
         this.rerankerService = rerankerService;
         this.objectMapper = objectMapper;
         this.config = properties.retrieval();
+        this.settings = settings;
         this.acronyms = pack.acronymExpansions();
         this.programs = compilePrograms(pack.programRules());
     }
@@ -76,10 +80,14 @@ public class RetrievalService {
             return RetrievalResult.empty();
         }
 
+        boolean rerank = settings.rerankEnabled();
+        int topK = settings.topK();
+        double threshold = settings.confidenceThreshold();
+
         // Fetch a wider candidate pool from each method, then merge.
-        int candidatePool = config.rerankEnabled()
+        int candidatePool = rerank
                 ? config.rerankCandidates()
-                : config.topK() * 2;
+                : topK * 2;
 
         // Expand acronyms from the domain pack (e.g. a terse acronym question
         // retrieves the same definitions as its fully spelled-out phrasing).
@@ -119,15 +127,15 @@ public class RetrievalService {
 
         // LLM rerank: hybrid scores find the neighborhood, the reranker picks
         // the truly relevant chunks. Replaces combinedScore with rerank score.
-        if (config.rerankEnabled() && !ranked.isEmpty()) {
-            ranked = rerankerService.rerank(question, ranked, config.topK());
-        } else if (ranked.size() > config.topK()) {
-            ranked = ranked.subList(0, config.topK());
+        if (rerank && !ranked.isEmpty()) {
+            ranked = rerankerService.rerank(question, ranked, topK);
+        } else if (ranked.size() > topK) {
+            ranked = ranked.subList(0, topK);
         }
 
         double confidence = ranked.isEmpty() ? 0.0 : ranked.getFirst().combinedScore();
-        boolean sufficient = confidence >= config.confidenceThreshold()
-                && ranked.size() >= Math.min(config.minResults(), config.topK());
+        boolean sufficient = confidence >= threshold
+                && ranked.size() >= Math.min(config.minResults(), topK);
 
         log.debug("Retrieval: {} vector hits, {} keyword hits, {} merged, confidence={}",
                 vectorHits.size(), keywordHits.size(), ranked.size(), confidence);
