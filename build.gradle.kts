@@ -49,6 +49,9 @@ dependencies {
     // --- Token counting for chunk sizing ---
     implementation("com.knuddels:jtokkit:1.1.0")
 
+    // --- S3 corpus sync ---
+    implementation("software.amazon.awssdk:s3")
+
     // --- Testing ---
     testImplementation("org.springframework.boot:spring-boot-starter-test")
     testImplementation("org.springframework.boot:spring-boot-testcontainers")
@@ -60,6 +63,7 @@ dependencies {
 dependencyManagement {
     imports {
         mavenBom("org.springframework.ai:spring-ai-bom:${property("springAiVersion")}")
+        mavenBom("software.amazon.awssdk:bom:2.29.23")
     }
     dependencies {
         // hibernate-vector is not in Boot's BOM; pin it to Boot's Hibernate version.
