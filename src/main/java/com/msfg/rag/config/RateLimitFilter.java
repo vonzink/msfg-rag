@@ -42,6 +42,11 @@ public class RateLimitFilter extends OncePerRequestFilter {
 
     @Override
     public boolean shouldNotFilter(HttpServletRequest request) {
+        // Preflights must not consume rate budget — they carry no application
+        // payload and never reach the handler; the real POST still gets limited.
+        if ("OPTIONS".equalsIgnoreCase(request.getMethod())) {
+            return true;
+        }
         // Decoded path — percent-encoding must not bypass rate limiting.
         return !PATH_HELPER.getPathWithinApplication(request).equals(askPath);
     }

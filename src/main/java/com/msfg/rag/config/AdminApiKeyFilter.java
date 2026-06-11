@@ -31,6 +31,12 @@ public class AdminApiKeyFilter extends OncePerRequestFilter {
 
     @Override
     public boolean shouldNotFilter(HttpServletRequest request) {
+        // Preflight OPTIONS never carries credentials and never reaches a
+        // handler — Spring MVC answers it from the CORS mappings. Gating it
+        // would break every cross-origin admin call.
+        if ("OPTIONS".equalsIgnoreCase(request.getMethod())) {
+            return true;
+        }
         // Only admin surfaces are gated; /ask and conversation reads are public.
         // Compare the DECODED path (what Spring routes on), never the raw
         // request URI — percent-encoding a letter must not skip the gate.
