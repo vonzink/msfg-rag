@@ -31,7 +31,7 @@ public class DomainPackLoader {
 
     // Intermediate per-file shapes (kebab-case keys map to these components).
     private record PackFile(String slug, String companyName, String disclaimer) {}
-    private record PromptFile(String template) {}
+    private record PromptFile(String template, String hardRules, String guidance) {}
     private record GuardrailsFile(List<String> prohibitedPhrases, String eligiblePhrase,
                                   DomainPack.CannedAnswers cannedAnswers) {}
     private record ClassifierFile(List<ClassifierRuleFile> rules) {}
@@ -88,6 +88,8 @@ public class DomainPackLoader {
                 packFile.companyName(),
                 packFile.disclaimer(),
                 promptFile.template(),
+                promptFile.hardRules(),
+                promptFile.guidance(),
                 new DomainPack.Guardrails(
                         guardrailsFile.prohibitedPhrases(),
                         guardrailsFile.eligiblePhrase(),
@@ -114,14 +116,16 @@ public class DomainPackLoader {
         require(dir, "pack.yaml", "company-name", notBlank(p.companyName()));
         require(dir, "pack.yaml", "disclaimer", notBlank(p.disclaimer()));
 
-        require(dir, "prompt.yaml", "template (needs exactly 3 %s placeholders)",
-                p.promptTemplate() != null && p.promptTemplate().split("%s", -1).length == 4);
+        require(dir, "prompt.yaml", "template (needs exactly 5 %s placeholders)",
+                p.promptTemplate() != null && p.promptTemplate().split("%s", -1).length == 6);
         try {
-            p.promptTemplate().formatted("", "", "");
+            p.promptTemplate().formatted("", "", "", "", "");
         } catch (IllegalFormatException e) {
             throw new PackValidationException("domain pack " + dir
                     + ": prompt.yaml: template is not a valid format string: " + e.getMessage());
         }
+        require(dir, "prompt.yaml", "hard-rules", notBlank(p.hardRules()));
+        require(dir, "prompt.yaml", "guidance", notBlank(p.guidance()));
 
         require(dir, "guardrails.yaml", "prohibited-phrases",
                 p.guardrails() != null && p.guardrails().prohibitedPhrases() != null

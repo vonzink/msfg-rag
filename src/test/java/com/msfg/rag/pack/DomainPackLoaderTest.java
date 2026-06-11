@@ -37,7 +37,9 @@ class DomainPackLoaderTest {
         assertEquals("testco", pack.slug());
         assertEquals("Test Company", pack.companyName());
         assertEquals("Educational only.", pack.disclaimer());
-        assertEquals("Context: %s\nQuestion: %s\nDisclaimer: %s\n", pack.promptTemplate());
+        assertEquals("Hard: %s\nSoft: %s\nContext: %s\nQuestion: %s\nDisclaimer: %s\n", pack.promptTemplate());
+        assertEquals("H1", pack.hardRules());
+        assertEquals("G1", pack.guidance());
 
         assertEquals(List.of("you are approved"), pack.guardrails().prohibitedPhrases());
         assertEquals("you are eligible", pack.guardrails().eligiblePhrase());
@@ -120,12 +122,25 @@ class DomainPackLoaderTest {
     }
 
     @Test
-    void templateWithoutThreePlaceholdersFailsBoot() throws IOException {
+    void templateWithoutFivePlaceholdersFailsBoot() throws IOException {
         Path dir = packCopy();
-        Files.writeString(dir.resolve("prompt.yaml"), "template: only %s here\n");
+        Files.writeString(dir.resolve("prompt.yaml"),
+                "template: only %s here\nhard-rules: |-\n  H1\nguidance: |-\n  G1\n");
         var ex = assertThrows(DomainPackLoader.PackValidationException.class,
                 () -> loader.load(dir));
         assertTrue(ex.getMessage().contains("template"), ex.getMessage());
+        assertTrue(ex.getMessage().contains("5"), ex.getMessage());
+    }
+
+    @Test
+    void blankHardRulesFailsBoot() throws IOException {
+        Path dir = packCopy();
+        Files.writeString(dir.resolve("prompt.yaml"),
+                "template: 'Hard: %s\\nSoft: %s\\nContext: %s\\nQuestion: %s\\nDisclaimer: %s\\n'\n"
+                + "hard-rules: \"\"\nguidance: |-\n  G1\n");
+        var ex = assertThrows(DomainPackLoader.PackValidationException.class,
+                () -> loader.load(dir));
+        assertTrue(ex.getMessage().contains("hard-rules"), ex.getMessage());
     }
 
     @Test
@@ -252,7 +267,7 @@ class DomainPackLoaderTest {
     void templateWithStrayFormatDirectiveFailsBoot() throws IOException {
         Path dir = packCopy();
         Files.writeString(dir.resolve("prompt.yaml"),
-                "template: 'a %s b %s c %s plus stray %q'\n");
+                "template: 'a %s b %s c %s d %s e %s plus stray %q'\nhard-rules: |-\n  H1\nguidance: |-\n  G1\n");
         var ex = assertThrows(DomainPackLoader.PackValidationException.class,
                 () -> loader.load(dir));
         assertTrue(ex.getMessage().contains("format string"), ex.getMessage());

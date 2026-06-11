@@ -16,6 +16,8 @@ public record DomainPack(
         String companyName,
         String disclaimer,
         String promptTemplate,
+        String hardRules,
+        String guidance,
         Guardrails guardrails,
         List<ClassifierRule> classifierRules,
         Map<String, String> acronymExpansions,

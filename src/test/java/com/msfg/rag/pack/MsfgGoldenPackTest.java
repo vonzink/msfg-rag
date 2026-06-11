@@ -1,12 +1,16 @@
 package com.msfg.rag.pack;
 
+import com.msfg.rag.service.ai.PromptBuilderService;
 import com.msfg.rag.service.ai.QuestionCategory;
+import com.msfg.rag.service.ai.RulesService;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 /**
  * Golden regression lock for the MSFG domain pack.
@@ -28,33 +32,17 @@ class MsfgGoldenPackTest {
     }
 
     @Test
-    void promptTemplateIsByteIdenticalToLegacyConstant() {
+    void skeletonIsByteExact() {
         String expected = """
                 You are an AI mortgage education assistant for Mountain State Financial Group.
 
                 You must answer ONLY using the approved source context provided below.
 
-                Rules:
-                1. Do not answer from general knowledge.
-                2. Do not invent mortgage guidelines.
-                3. Do not provide loan approval, legal advice, tax advice, or underwriting decisions.
-                4. If the source context does not answer the question, say you cannot find enough information.
-                5. Use careful wording such as "may," "generally," and "subject to full loan review."
-                6. Include citations from the provided source context. The "citations"
-                   array is REQUIRED and must contain at least one entry whenever
-                   source context is provided above. Cite every [Source N] you relied
-                   on to write the answer. NEVER return an empty "citations" array
-                   when source context is present — if you used the sources to answer,
-                   you must list them.
-                7. Keep the answer clear and borrower-friendly.
-                8. In citations, copy source_name, document_name, section, page_number, and
-                   effective_date EXACTLY as given in the source context metadata. If a field is
-                   not present for a source, set it to null. NEVER invent page numbers, section
-                   names, or dates.
-                9. Pay attention to which loan program each source covers (FHA, VA, conventional).
-                   If the question is about one program, do not answer using a different
-                   program's guideline. If no source covers the right program, say you cannot
-                   find enough information.
+                Hard rules — follow these without exception:
+                %s
+
+                Guidance — strong recommendations:
+                %s
 
                 Approved Source Context:
                 %s
@@ -81,6 +69,38 @@ class MsfgGoldenPackTest {
                 }
                 """;
         assertEquals(expected, PACK.promptTemplate());
+    }
+
+    @Test
+    void defaultHardRulesAreByteExact() {
+        String expected =
+                "1. Do not answer from general knowledge.\n" +
+                "2. Do not invent mortgage guidelines.\n" +
+                "3. Do not provide loan approval, legal advice, tax advice, or underwriting decisions.\n" +
+                "4. If the source context does not answer the question, say you cannot find enough information.\n" +
+                "5. Include citations from the provided source context. The \"citations\"\n" +
+                "   array is REQUIRED and must contain at least one entry whenever\n" +
+                "   source context is provided above. Cite every [Source N] you relied\n" +
+                "   on to write the answer. NEVER return an empty \"citations\" array\n" +
+                "   when source context is present — if you used the sources to answer,\n" +
+                "   you must list them.\n" +
+                "6. In citations, copy source_name, document_name, section, page_number, and\n" +
+                "   effective_date EXACTLY as given in the source context metadata. If a field is\n" +
+                "   not present for a source, set it to null. NEVER invent page numbers, section\n" +
+                "   names, or dates.\n" +
+                "7. Pay attention to which loan program each source covers (FHA, VA, conventional).\n" +
+                "   If the question is about one program, do not answer using a different\n" +
+                "   program's guideline. If no source covers the right program, say you cannot\n" +
+                "   find enough information.";
+        assertEquals(expected, PACK.hardRules());
+    }
+
+    @Test
+    void defaultGuidanceIsByteExact() {
+        String expected =
+                "1. Use careful wording such as \"may,\" \"generally,\" and \"subject to full loan review.\"\n" +
+                "2. Keep the answer clear and borrower-friendly.";
+        assertEquals(expected, PACK.guidance());
     }
 
     @Test
@@ -187,6 +207,28 @@ class MsfgGoldenPackTest {
                 "\\brate (quote|lock)\\b.*\\b(today|now|get)\\b",
                 "\\bwhat rate\\b.*\\b(get|offer|give)\\b"
         ), rules.get(4).patterns());
+    }
+
+    @Test
+    void defaultAssemblyIsByteExact() {
+        RulesService rulesService = mock(RulesService.class);
+        when(rulesService.effectiveHard()).thenReturn(PACK.hardRules());
+        when(rulesService.effectiveGuidance()).thenReturn(PACK.guidance());
+
+        String assembled = new PromptBuilderService(PACK, rulesService).build("Q", List.of());
+
+        String expected = PACK.promptTemplate().formatted(
+                PACK.hardRules(),
+                PACK.guidance(),
+                "(no source context found)",
+                "Q",
+                PACK.disclaimer());
+        assertEquals(expected, assembled);
+
+        // Assembly-mechanics anchors — byte-exact
+        assertTrue(assembled.contains("Hard rules — follow these without exception:"));
+        assertTrue(assembled.contains("Guidance — strong recommendations:"));
+        assertTrue(assembled.contains("\"human_escalation_required\": false"));
     }
 
     @Test

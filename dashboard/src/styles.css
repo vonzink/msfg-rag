@@ -310,3 +310,25 @@ input:focus, select:focus { border-color: var(--accent); box-shadow: 0 0 0 2px r
 
 /* Detail row */
 .detail-row p { margin-bottom: 6px; }
+
+/* Rules screen */
+.rulebox {
+  width: 100%;
+  min-height: 170px;
+  font-family: var(--mono, ui-monospace, monospace);
+  font-size: 12.5px;
+  line-height: 1.6;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  resize: vertical;
+}
+
+.hist-row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  font-size: 12.5px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border);
+}
