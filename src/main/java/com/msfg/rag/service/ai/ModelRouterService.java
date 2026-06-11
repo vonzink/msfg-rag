@@ -10,14 +10,18 @@ import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
- * Routes requests to the configured default provider, falling back to the
- * configured fallback provider if the primary call fails. Providers are
- * discovered automatically — any AiModelProvider bean is routable, so new
- * adapters (Gemini, DeepSeek, Groq) plug in with zero router changes.
+ * Routes requests to the per-purpose provider resolved from RuntimeSettings,
+ * falling back to the configured fallback provider if the primary call fails.
+ * Providers are discovered automatically — any AiModelProvider bean is routable,
+ * so new adapters (Gemini, DeepSeek, Groq) plug in with zero router changes.
+ *
+ * CRITICAL invariant: the fallback provider always receives request.withModel(null)
+ * — a primary's model name must never be sent to a different provider.
  */
 @Service
 public class ModelRouterService {
@@ -26,11 +30,14 @@ public class ModelRouterService {
 
     private final Map<String, AiModelProvider> providers;
     private final RagProperties.Routing routing;
+    private final RuntimeSettings settings;
 
-    public ModelRouterService(List<AiModelProvider> providerBeans, RagProperties properties) {
+    public ModelRouterService(List<AiModelProvider> providerBeans, RagProperties properties,
+                              RuntimeSettings settings) {
         this.providers = providerBeans.stream()
                 .collect(Collectors.toMap(AiModelProvider::getProviderName, Function.identity()));
         this.routing = properties.routing();
+        this.settings = settings;
 
         if (!providers.containsKey(routing.defaultProvider())) {
             throw new IllegalStateException(
@@ -43,9 +50,19 @@ public class ModelRouterService {
      * @return the response plus whether the fallback provider had to be used
      */
     public RoutedResponse generate(AiRequest request) {
-        AiModelProvider primary = providers.get(routing.defaultProvider());
+        boolean utility = request.purpose() == AiRequest.Purpose.UTILITY;
+        String configuredProvider = utility ? settings.utilityProvider() : settings.answerProvider();
+        String model = utility ? settings.utilityModel() : settings.answerModel();
+
+        AiModelProvider primary = providers.get(configuredProvider);
+        if (primary == null) {
+            log.warn("Configured {} provider '{}' is not registered; using default '{}'",
+                    utility ? "utility" : "answer", configuredProvider, routing.defaultProvider());
+            primary = providers.get(routing.defaultProvider());
+        }
+
         try {
-            return new RoutedResponse(primary.generate(request), false);
+            return new RoutedResponse(primary.generate(request.withModel(model)), false);
         } catch (Exception primaryFailure) {
             log.error("Primary AI provider '{}' failed: {}",
                     primary.getProviderName(), primaryFailure.getMessage());
@@ -55,8 +72,14 @@ public class ModelRouterService {
                 throw primaryFailure;
             }
             log.warn("Falling back to provider '{}'", fallback.getProviderName());
-            return new RoutedResponse(fallback.generate(request), true);
+            // The fallback always runs its own default model — a primary's
+            // model name must never be sent to a different provider.
+            return new RoutedResponse(fallback.generate(request.withModel(null)), true);
         }
+    }
+
+    public Set<String> providerNames() {
+        return providers.keySet();
     }
 
     public record RoutedResponse(AiResponse response, boolean fallbackUsed) {
