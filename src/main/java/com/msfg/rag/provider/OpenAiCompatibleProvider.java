@@ -24,7 +24,15 @@ public class OpenAiCompatibleProvider implements AiModelProvider {
         this.providerName = providerName;
         this.defaultModel = defaultModel;
         this.chatModel = OpenAiChatModel.builder()
-                .openAiApi(OpenAiApi.builder().baseUrl(baseUrl).apiKey(apiKey).build())
+                .openAiApi(OpenAiApi.builder()
+                        .baseUrl(baseUrl)
+                        .apiKey(apiKey)
+                        // Spring AI 1.1.7 defaults completionsPath to /v1/chat/completions,
+                        // which double-prefixes Grok (base ends in /v1) and breaks Gemini's
+                        // compat endpoint. /chat/completions resolves correctly against all
+                        // three committed base URLs, including DeepSeek's primary path.
+                        .completionsPath("/chat/completions")
+                        .build())
                 .build();
     }
 
