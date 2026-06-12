@@ -42,7 +42,7 @@ export default function Settings() {
   const effective = (key: string) => String(data.effective[key] ?? "");
   const value = (key: string) => draft[key] ?? effective(key);
   const overridden = Object.keys(data.overrides);
-  const configuredProviders = (data.providers ?? []).filter((p) => p.configured).map((p) => p.name);
+  const configuredProviders = data.providers.filter((p) => p.configured).map((p) => p.name);
 
   function providerOptions(selectKey: string) {
     const current = value(selectKey);
@@ -57,7 +57,7 @@ export default function Settings() {
         <h1>Settings</h1>
         <span className="muted">changes go live within ~10 s, no restart</span>
       </header>
-      {data.providers && data.providers.length > 0 && (
+      {data.providers.length > 0 && (
         <div className="chips">
           {data.providers.map((p) => (
             <Pill key={p.name} tone={p.configured ? "green" : "gray"}>

@@ -23,6 +23,7 @@ class AdminSettingsControllerTest {
             new AdminSettingsController(settings, router);
 
     private void stubAllSettings() {
+        when(router.providerNames()).thenReturn(Set.of("anthropic", "openai"));
         when(settings.answerProvider()).thenReturn("anthropic");
         when(settings.answerModel()).thenReturn(null);
         when(settings.utilityProvider()).thenReturn("anthropic");
@@ -49,8 +50,8 @@ class AdminSettingsControllerTest {
     @Test
     @SuppressWarnings("unchecked")
     void getReturnsProvidersBlockInCatalogOrder() {
-        when(router.providerNames()).thenReturn(Set.of("anthropic", "openai", "deepseek"));
         stubAllSettings();
+        when(router.providerNames()).thenReturn(Set.of("anthropic", "openai", "deepseek"));
 
         Map<String, Object> body = controller.get();
 
