@@ -18,6 +18,7 @@ export interface SyncReport { dryRun: boolean; summary: Record<string, number>; 
 export interface SettingsResponse {
   effective: Record<string, string | number | boolean | null>;
   overrides: Record<string, string>;
+  providers: { name: string; configured: boolean }[];
 }
 
 export interface Citation {
