@@ -73,6 +73,42 @@ lsof -ti:8090 -ti:5173 | xargs kill
 | Sync fails | AWS credentials: the same setup the `scripts/s3-ingest` tool uses must be available |
 | Old process on port 8080 | That's the pre-platform brain — safe to kill: `lsof -ti:8080 \| xargs kill` |
 
+## Adding an AI provider
+
+Three extra providers ship in the code — DeepSeek, Gemini, and Grok — but each
+one only activates when its API key is present. Without a key the provider is
+invisible to the dashboard.
+
+**To activate a provider:**
+
+1. Open `.env` in TextEdit:
+
+   ```sh
+   open -e ~/MSFG/msfg-rag/.env
+   ```
+
+2. Find the matching `..._API_KEY=` line and paste your key directly after the
+   `=` (no spaces). For example:
+
+   ```
+   DEEPSEEK_API_KEY=sk-xxxxxxxxxxxxxxxx
+   ```
+
+3. Save the file and restart the brain (Ctrl+C in its terminal, then run the
+   start command again).
+
+4. The provider now appears in the **Settings** screen — pick it from the
+   answer-lane or utility-lane dropdown and save.
+
+**Before trusting a new provider with customer answers:** try it on the
+**UTILITY** lane (reranker) first. Gemini and Grok are wired and ready but have
+not been verified with a real key — routing borrower questions through them
+before a quick sanity-check on the utility lane is a bigger risk than it looks.
+
+**Data-handling reminder:** routing borrower questions to any new vendor means
+that data leaves Anthropic/OpenAI — confirm the vendor's data-handling terms
+are acceptable before enabling a new provider on the answer lane in production.
+
 ## Corpus updates
 
 Drop files into `s3://msfg.us/rag-brain/` (and list them in `_manifest.json`
