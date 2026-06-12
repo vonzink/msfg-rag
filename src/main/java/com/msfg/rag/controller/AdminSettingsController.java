@@ -9,6 +9,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -20,6 +21,9 @@ import java.util.Set;
 @RestController
 @RequestMapping("/api/ai/admin/settings")
 public class AdminSettingsController {
+
+    private static final List<String> KNOWN_PROVIDERS =
+            List.of("anthropic", "openai", "deepseek", "gemini", "grok");
 
     private static final Set<String> PROVIDER_KEYS = Set.of("answer.provider", "utility.provider");
     private static final Set<String> MODEL_KEYS = Set.of("answer.model", "utility.model");
@@ -45,7 +49,17 @@ public class AdminSettingsController {
         effective.put("retrieval.confidence-threshold", settings.confidenceThreshold());
         effective.put("retrieval.top-k", settings.topK());
         effective.put("rerank.enabled", settings.rerankEnabled());
-        return Map.of("effective", effective, "overrides", settings.overrides());
+
+        Set<String> configured = router.providerNames();
+        List<Map<String, Object>> providers = KNOWN_PROVIDERS.stream()
+                .map(n -> Map.<String, Object>of("name", n, "configured", configured.contains(n)))
+                .toList();
+
+        Map<String, Object> envelope = new LinkedHashMap<>();
+        envelope.put("effective", effective);
+        envelope.put("overrides", settings.overrides());
+        envelope.put("providers", providers);
+        return envelope;
     }
 
     @PutMapping
