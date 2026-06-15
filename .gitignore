@@ -21,3 +21,6 @@ data/
 
 # Node dependencies (regenerable via `npm install`)
 node_modules/
+
+# Brainstorming visual-companion mockups (local, regenerable)
+.superpowers/
