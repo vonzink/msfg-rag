@@ -56,3 +56,12 @@ export interface RuleRevisionDto {
   revision: number; createdAt: string; createdBy: string;
   reverted: boolean; content: string | null;
 }
+
+export interface VocabState {
+  content: string; source: "pack" | "custom";
+  updatedAt: string | null; updatedBy: string | null; entries: number;
+}
+export interface VocabRevisionDto {
+  revision: number; createdAt: string; createdBy: string;
+  reverted: boolean; content: string | null;
+}

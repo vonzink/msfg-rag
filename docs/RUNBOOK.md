@@ -69,7 +69,7 @@ Press `Ctrl + C` in each terminal tab, or from anywhere:
 lsof -ti:8090 -ti:5173 | xargs kill
 ```
 
-## The five dashboard screens
+## The six dashboard screens
 
 | Screen | What it does |
 |---|---|
@@ -78,6 +78,17 @@ lsof -ti:8090 -ti:5173 | xargs kill
 | Test console | Ask the brain as if you were a website visitor, or "Retrieval only" to see which sources it found |
 | Audit | Every question ever asked: confidence, model used, escalations; click a row for the full answer |
 | Rules | **Your control panel for answers.** Hard rules (no wiggle room) and Strong recommendations (guidance). Edit → Save as new revision → live in ~10 s. Preview full prompt shows exactly what the AI is told. Revert to pack default any time; full history kept |
+| Vocabulary | Borrower/broker words → guideline words; search-time synonyms (e.g. "duplex" → "2-unit", "owner occupied" → "principal residence"). Edit → live ~10 s. Revert to pack default; full history; test-a-phrase expansion preview |
+
+### Three-layer model
+
+The brain separates concerns into three layers that each do one job:
+
+| Layer | What it controls | Where it lives |
+|---|---|---|
+| **Corpus** | The facts — every guideline, matrix row, and policy document | Documents in the database |
+| **Vocabulary** | Finding the facts — translates borrower/broker words into the words the guidelines use, so retrieval surfaces the right row | `brain_vocabulary_revisions`; seed in `retrieval.yaml` |
+| **Rules** | Wording the answer — tells the AI what it must/should say once the right facts are found | `brain_rule_revisions`; seed in the pack prompt |
 
 ## Troubleshooting
 

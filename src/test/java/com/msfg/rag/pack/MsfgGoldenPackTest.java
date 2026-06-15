@@ -233,22 +233,38 @@ class MsfgGoldenPackTest {
 
     @Test
     void retrievalRulesMatchLegacy() {
-        // Full acronym map — 14 entries
+        // Full acronym map — 30 entries
         assertEquals(Map.ofEntries(
-                Map.entry("pmi",   "private mortgage insurance"),
-                Map.entry("mip",   "mortgage insurance premium"),
-                Map.entry("dti",   "debt-to-income"),
-                Map.entry("ltv",   "loan-to-value"),
-                Map.entry("cltv",  "combined loan-to-value"),
-                Map.entry("piti",  "principal interest taxes insurance"),
-                Map.entry("arm",   "adjustable-rate mortgage"),
-                Map.entry("heloc", "home equity line of credit"),
-                Map.entry("hoa",   "homeowners association"),
-                Map.entry("apr",   "annual percentage rate"),
-                Map.entry("aus",   "automated underwriting system"),
-                Map.entry("fha",   "Federal Housing Administration"),
-                Map.entry("va",    "Veterans Affairs"),
-                Map.entry("usda",  "United States Department of Agriculture")
+                Map.entry("pmi",              "private mortgage insurance"),
+                Map.entry("mip",              "mortgage insurance premium"),
+                Map.entry("dti",              "debt-to-income"),
+                Map.entry("ltv",              "loan-to-value"),
+                Map.entry("cltv",             "combined loan-to-value"),
+                Map.entry("piti",             "principal interest taxes insurance"),
+                Map.entry("arm",              "adjustable-rate mortgage"),
+                Map.entry("heloc",            "home equity line of credit"),
+                Map.entry("hoa",              "homeowners association"),
+                Map.entry("apr",              "annual percentage rate"),
+                Map.entry("aus",              "automated underwriting system"),
+                Map.entry("fha",              "Federal Housing Administration"),
+                Map.entry("va",               "Veterans Affairs"),
+                Map.entry("usda",             "United States Department of Agriculture"),
+                Map.entry("duplex",           "2-unit two-unit 2-4 units"),
+                Map.entry("triplex",          "3-unit three-unit 2-4 units"),
+                Map.entry("fourplex",         "4-unit four-unit 2-4 units"),
+                Map.entry("quadplex",         "4-unit four-unit 2-4 units"),
+                Map.entry("owner occupied",   "principal residence"),
+                Map.entry("primary residence","principal residence"),
+                Map.entry("primary",          "principal residence"),
+                Map.entry("non-owner occupied","investment property"),
+                Map.entry("investment",       "investment property"),
+                Map.entry("rental",           "investment property"),
+                Map.entry("vacation home",    "second home"),
+                Map.entry("rate and term",    "limited cash-out refinance"),
+                Map.entry("cash out",         "cash-out refinance"),
+                Map.entry("condo",            "condominium project"),
+                Map.entry("self employed",    "self-employment income"),
+                Map.entry("jumbo",            "non-conforming")
         ), PACK.acronymExpansions());
 
         // Program rules — 4 in order

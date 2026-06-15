@@ -106,4 +106,50 @@ class RetrievalServiceTest {
         assertEquals(1.2, RetrievalService.programScoreFactor(programs, "CONVENTIONAL"));
         assertEquals(0.4, RetrievalService.programScoreFactor(programs, "VA"));
     }
+
+    @Test
+    void expandQueryMatchesMultiWordPhraseKeys() {
+        java.util.Map<String, String> syn = java.util.Map.of("owner occupied", "principal residence", "duplex", "2-unit");
+        String out = RetrievalService.expandQuery("max ltv on an owner occupied duplex", syn);
+        assertTrue(out.contains("principal residence"), out);
+        assertTrue(out.contains("2-unit"), out);
+    }
+
+    @Test
+    void expandQueryNormalizesHyphensSoOwnerOccupiedFormsMatch() {
+        java.util.Map<String, String> syn = java.util.Map.of("owner occupied", "principal residence");
+        assertTrue(RetrievalService.expandQuery("an owner-occupied home", syn).contains("principal residence"));
+    }
+
+    @Test
+    void expandQueryGreedyLongestMatchPreventsNonOwnerFromTriggeringOwnerOccupied() {
+        // "non-owner occupied" must expand to investment, NOT principal residence.
+        java.util.Map<String, String> syn = java.util.Map.of(
+                "owner occupied", "principal residence",
+                "non-owner occupied", "investment property");
+        String out = RetrievalService.expandQuery("a non-owner occupied duplex", syn);
+        assertTrue(out.contains("investment property"), out);
+        assertFalse(out.contains("principal residence"), out);
+    }
+
+    @Test
+    void expandQueryAppendsInQuestionOrderAndOnlyOriginalPlusExpansions() {
+        java.util.Map<String, String> syn = java.util.Map.of("duplex", "2-unit", "ltv", "loan-to-value");
+        String q = "ltv for a duplex";
+        String out = RetrievalService.expandQuery(q, syn);
+        assertEquals(q + " loan-to-value 2-unit", out); // ltv occurs before duplex
+    }
+
+    @Test
+    void expandQueryReturnsUnchangedWhenNoMatchOrEmptyMap() {
+        assertEquals("hello world", RetrievalService.expandQuery("hello world", java.util.Map.of("duplex", "2-unit")));
+        assertEquals("hello", RetrievalService.expandQuery("hello", java.util.Map.of()));
+    }
+
+    @Test
+    void expandQueryStillExpandsSingleAcronymStandaloneOnly() {
+        java.util.Map<String, String> syn = java.util.Map.of("pmi", "private mortgage insurance");
+        assertTrue(RetrievalService.expandQuery("what is pmi", syn).contains("private mortgage insurance"));
+        assertEquals("warmup", RetrievalService.expandQuery("warmup", java.util.Map.of("arm", "adjustable-rate mortgage")));
+    }
 }

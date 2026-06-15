@@ -43,7 +43,7 @@ public class RetrievalService {
     private final ObjectMapper objectMapper;
     private final RagProperties.Retrieval config;
     private final RuntimeSettings settings;
-    private final Map<String, String> acronyms;
+    private final VocabularyService vocabulary;
     private final List<CompiledProgram> programs;
 
     public RetrievalService(DocumentChunkRepository chunkRepository,
@@ -52,14 +52,15 @@ public class RetrievalService {
                             ObjectMapper objectMapper,
                             RagProperties properties,
                             DomainPack pack,
-                            RuntimeSettings settings) {
+                            RuntimeSettings settings,
+                            VocabularyService vocabulary) {
         this.chunkRepository = chunkRepository;
         this.embeddingService = embeddingService;
         this.rerankerService = rerankerService;
         this.objectMapper = objectMapper;
         this.config = properties.retrieval();
         this.settings = settings;
-        this.acronyms = pack.acronymExpansions();
+        this.vocabulary = vocabulary;
         this.programs = compilePrograms(pack.programRules());
     }
 
@@ -93,7 +94,7 @@ public class RetrievalService {
         // retrieves the same definitions as its fully spelled-out phrasing).
         // Only the retrieval inputs use the expansion; program detection and
         // the reranker below still operate on the original question.
-        String expandedQuestion = expandQuery(question, acronyms);
+        String expandedQuestion = expandQuery(question, vocabulary.effectiveSynonyms());
 
         float[] questionEmbedding = embeddingService.embed(expandedQuestion);
         String vectorLiteral = EmbeddingService.toVectorLiteral(questionEmbedding);
@@ -197,32 +198,69 @@ public class RetrievalService {
             "the", "to", "use", "used", "we", "what", "when", "which", "will", "with");
 
     /**
-     * Appends expansions for any domain acronyms in the question so a terse
-     * acronym question retrieves the same sources as its fully spelled-out
-     * phrasing. The expanded text feeds both the embedding and the keyword
-     * query; the original question still drives program detection and
-     * reranking. Returns the question unchanged when it contains no known
-     * acronym. Matching is token-based, so an acronym only expands as a
-     * standalone word. Expansions come from the domain pack.
+     * Expands a question with domain synonyms so borrower/broker vocabulary
+     * retrieves guideline-vocabulary chunks (e.g. "owner occupied duplex" also
+     * searches "principal residence 2-unit"). Supports multi-word phrase keys
+     * via greedy longest-match: longer phrases match first and are masked, so a
+     * shorter overlapping phrase cannot also fire — "non-owner occupied" never
+     * triggers "owner occupied" -> "principal residence".
+     *
+     * Matching is normalized (lowercase; hyphens/punctuation -> spaces) on both
+     * the question and the keys, so "owner-occupied" and "owner occupied" behave
+     * alike. Expansions are appended to the ORIGINAL question in question order;
+     * the original still drives program detection and reranking. Returns the
+     * question unchanged when nothing matches.
      */
-    static String expandQuery(String question, Map<String, String> acronyms) {
-        if (question == null || question.isBlank()) {
+    static String expandQuery(String question, Map<String, String> synonyms) {
+        if (question == null || question.isBlank() || synonyms == null || synonyms.isEmpty()) {
             return question;
         }
-        String[] tokens = question.toLowerCase(java.util.Locale.US)
-                .replaceAll("[^a-z0-9 ]", " ")
-                .split("\\s+");
-        java.util.LinkedHashSet<String> expansions = new java.util.LinkedHashSet<>();
-        for (String token : tokens) {
-            String expansion = acronyms.get(token);
-            if (expansion != null) {
-                expansions.add(expansion);
+        String work = " " + normalizeForMatch(question) + " ";
+
+        // Longest (most words) first so phrases win over their sub-words.
+        List<Map.Entry<String, String>> entries = synonyms.entrySet().stream()
+                .sorted(Comparator.comparingInt(
+                        (Map.Entry<String, String> e) -> wordCount(normalizeForMatch(e.getKey()))).reversed())
+                .toList();
+
+        record Match(int pos, String expansion) {}
+        List<Match> matches = new java.util.ArrayList<>();
+        for (Map.Entry<String, String> e : entries) {
+            String key = normalizeForMatch(e.getKey());
+            if (key.isBlank()) {
+                continue;
+            }
+            String needle = " " + key + " ";
+            int idx = work.indexOf(needle);
+            if (idx >= 0) {
+                matches.add(new Match(idx, e.getValue()));
+                // Mask the matched key (keep the surrounding spaces, preserve length)
+                // so a shorter overlapping phrase cannot also match this span.
+                String masked = " ".repeat(needle.length());
+                work = work.substring(0, idx) + masked + work.substring(idx + needle.length());
             }
         }
-        if (expansions.isEmpty()) {
+        if (matches.isEmpty()) {
             return question;
         }
+        matches.sort(Comparator.comparingInt(Match::pos));
+        java.util.LinkedHashSet<String> expansions = new java.util.LinkedHashSet<>();
+        for (Match m : matches) {
+            expansions.add(m.expansion());
+        }
         return question + " " + String.join(" ", expansions);
+    }
+
+    /** Lowercase; collapse every run of non-alphanumerics (incl. hyphens) to a single space; trim. */
+    private static String normalizeForMatch(String s) {
+        return s.toLowerCase(java.util.Locale.US).replaceAll("[^a-z0-9]+", " ").strip();
+    }
+
+    private static int wordCount(String normalized) {
+        if (normalized.isBlank()) {
+            return 0;
+        }
+        return normalized.split("\\s+").length;
     }
 
     /**
