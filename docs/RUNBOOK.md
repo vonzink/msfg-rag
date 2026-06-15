@@ -27,7 +27,23 @@ open -e .env
 After changing `.env`, restart the brain (Ctrl+C in its terminal, run the
 start command again) — env values are read at startup.
 
+## Start everything (one shot)
+
+Paste this single line into a terminal. It brings up the database, starts the
+brain (waits until it's healthy), starts the dashboard, and opens the browser —
+skipping anything already running. Leave the terminal open; the servers run in
+the background.
+
+```sh
+cd ~/MSFG/msfg-rag && docker compose up -d postgres >/dev/null 2>&1; curl -sf -m2 http://localhost:8090/actuator/health >/dev/null 2>&1 && echo "✓ brain already running" || { echo "→ starting brain (first boot ~15s)…"; ( set -a; source .env; set +a; nohup ./gradlew bootRun --args='--server.port=8090' >/tmp/brain_api.log 2>&1 & ); }; printf "→ waiting for brain"; ok=""; for i in $(seq 1 60); do curl -sf -m2 http://localhost:8090/actuator/health >/dev/null 2>&1 && { ok=1; break; }; printf "."; sleep 2; done; echo; if [ -z "$ok" ]; then echo "✗ brain failed to start — last log lines:"; tail -n 15 /tmp/brain_api.log; else lsof -ti:5173 >/dev/null 2>&1 && echo "✓ dashboard already running" || { echo "→ starting dashboard…"; ( cd dashboard && { [ -d node_modules ] || npm install; } && nohup npm run dev >/tmp/brain_dash.log 2>&1 & ); sleep 4; }; open http://localhost:5173; echo "✓ open http://localhost:5173 — unlock with ADMIN_API_KEY from .env"; fi
+```
+
+Unlock with the admin key (`grep ADMIN_API_KEY .env | cut -d= -f2- | pbcopy`
+copies it). To stop everything later: `lsof -ti:8090 -ti:5173 | xargs kill`.
+
 ## Start everything (two terminal tabs)
+
+If you prefer to watch the logs live, run each in its own tab instead.
 
 **Tab 1 — the brain (API on port 8090):**
 
@@ -67,7 +83,7 @@ lsof -ti:8090 -ti:5173 | xargs kill
 
 | Symptom | Fix |
 |---|---|
-| Brain won't start, database connection error | `docker start msfg-rag-postgres`, then start the brain again |
+| Brain won't start, database connection error | `docker compose up -d postgres` (recreates the DB container from docker-compose.yml, data volume intact), then start the brain again |
 | "Port 8090 already in use" | An old copy is running: `lsof -ti:8090 \| xargs kill`, then start again |
 | Dashboard says key rejected | Re-copy the key from `.env` (no spaces); the brain must be running first |
 | Sync fails | AWS credentials: the same setup the `scripts/s3-ingest` tool uses must be available |
