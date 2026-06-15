@@ -73,6 +73,22 @@ export default function Corpus({ stats, onCorpusChanged }:
     }
   }
 
+  async function remove(d: DocumentDto) {
+    if (!window.confirm(`Delete "${d.title}"? This removes the file, its search chunks, and the record. This cannot be undone.`)) {
+      return;
+    }
+    setBusy(d.id);
+    setError(null);
+    try {
+      await api.del(`/api/ai/documents/${d.id}`);
+      reload(); onCorpusChanged();
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(null);
+    }
+  }
+
   const reload = useCallback(() => {
     api.get<DocumentDto[]>("/api/ai/documents").then(setDocs).catch((e) => setError(e.message));
   }, []);
@@ -187,6 +203,9 @@ export default function Corpus({ stats, onCorpusChanged }:
                 </button>
                 <button onClick={() => setActive(d, !d.active)}>
                   {d.active ? "Deactivate" : "Activate"}
+                </button>
+                <button className="danger" onClick={() => remove(d)} disabled={busy === d.id}>
+                  Delete
                 </button>
               </td>
             </tr>
