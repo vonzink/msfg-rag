@@ -11,6 +11,7 @@ import com.msfg.rag.service.sync.SyncReport;
 import com.msfg.rag.service.sync.SyncService;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -99,6 +100,12 @@ public class DocumentAdminController {
     @PostMapping("/{id}/deactivate")
     public ResponseEntity<DocumentDto> deactivate(@PathVariable UUID id) {
         return setActive(id, false);
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Map<String, Object>> delete(@PathVariable UUID id) {
+        ingestionService.delete(id);
+        return ResponseEntity.ok(Map.of("deleted", true, "id", id));
     }
 
     /**
