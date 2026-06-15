@@ -46,4 +46,29 @@ describe("api client", () => {
     await expect(api.put("/api/ai/admin/settings", {})).rejects.toThrow(
       "retrieval.top-k must be between 1 and 50");
   });
+
+  it("sends a PATCH with body and the admin key", async () => {
+    adminKey.set("k");
+    const fetchMock = fetchReturning(200, { id: "1", title: "New" });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await api.patch("/api/ai/documents/1", { title: "New" });
+
+    const init = (fetchMock.mock.calls[0] as unknown as [string, RequestInit])[1];
+    expect(init.method).toBe("PATCH");
+    expect(init.body).toBe(JSON.stringify({ title: "New" }));
+    expect(new Headers(init.headers).get("X-Admin-Api-Key")).toBe("k");
+  });
+
+  it("sends a DELETE with the admin key", async () => {
+    adminKey.set("k");
+    const fetchMock = fetchReturning(200, { deleted: true });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await api.del("/api/ai/documents/1");
+
+    const init = (fetchMock.mock.calls[0] as unknown as [string, RequestInit])[1];
+    expect(init.method).toBe("DELETE");
+    expect(new Headers(init.headers).get("X-Admin-Api-Key")).toBe("k");
+  });
 });
