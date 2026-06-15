@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { api } from "../api";
 import { DocumentDto, Stats, SyncReport } from "../types";
 import { ErrorNote, Pill, Stat } from "../components";
@@ -9,6 +9,37 @@ export default function Corpus({ stats, onCorpusChanged }:
   const [report, setReport] = useState<SyncReport | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  const [showAdd, setShowAdd] = useState(false);
+  const [addBusy, setAddBusy] = useState(false);
+  const [addFile, setAddFile] = useState<File | null>(null);
+  const [addTitle, setAddTitle] = useState("");
+  const [addSourceName, setAddSourceName] = useState("");
+  const [addSourceType, setAddSourceType] = useState("AGENCY_GUIDELINE");
+  const [addEffectiveDate, setAddEffectiveDate] = useState("");
+
+  async function submitAdd(e: React.FormEvent) {
+    e.preventDefault();
+    if (!addFile || !addTitle.trim() || !addSourceName.trim()) return;
+    setAddBusy(true);
+    setError(null);
+    try {
+      const form = new FormData();
+      form.append("file", addFile);
+      form.append("title", addTitle.trim());
+      form.append("sourceName", addSourceName.trim());
+      form.append("sourceType", addSourceType);
+      if (addEffectiveDate) form.append("effectiveDate", addEffectiveDate);
+      await api.upload("/api/ai/documents/upload", form);
+      setShowAdd(false);
+      setAddFile(null); setAddTitle(""); setAddSourceName(""); setAddEffectiveDate("");
+      reload(); onCorpusChanged();
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setAddBusy(false);
+    }
+  }
 
   const reload = useCallback(() => {
     api.get<DocumentDto[]>("/api/ai/documents").then(setDocs).catch((e) => setError(e.message));
@@ -50,6 +81,9 @@ export default function Corpus({ stats, onCorpusChanged }:
       <header className="screen-head">
         <h1>Corpus</h1>
         <div className="actions">
+          <button onClick={() => setShowAdd((v) => !v)} disabled={busy !== null}>
+            {showAdd ? "Cancel" : "Add document"}
+          </button>
           <button onClick={() => runSync(true)} disabled={busy !== null}>
             {busy === "dry" ? "Planning…" : "Dry run"}
           </button>
@@ -59,6 +93,28 @@ export default function Corpus({ stats, onCorpusChanged }:
         </div>
       </header>
       <ErrorNote message={error} />
+      {showAdd && (
+        <form className="card" onSubmit={submitAdd} style={{ display: "grid", gap: 8, marginBottom: 12 }}>
+          <input type="file" required
+                 onChange={(e) => setAddFile(e.target.files?.[0] ?? null)} />
+          <input placeholder="Title" value={addTitle}
+                 onChange={(e) => setAddTitle(e.target.value)} required />
+          <input placeholder="Source name (e.g. HUD)" value={addSourceName}
+                 onChange={(e) => setAddSourceName(e.target.value)} required />
+          <select value={addSourceType} onChange={(e) => setAddSourceType(e.target.value)}>
+            <option value="AGENCY_GUIDELINE">agency guideline</option>
+            <option value="INTERNAL_POLICY">internal policy</option>
+            <option value="INVESTOR_OVERLAY">investor overlay</option>
+            <option value="EDUCATIONAL">educational</option>
+          </select>
+          <input type="date" value={addEffectiveDate}
+                 onChange={(e) => setAddEffectiveDate(e.target.value)} />
+          <button className="btn-primary" type="submit"
+                  disabled={addBusy || !addFile || !addTitle.trim() || !addSourceName.trim()}>
+            {addBusy ? "Uploading…" : "Upload & ingest"}
+          </button>
+        </form>
+      )}
       <div className="cards">
         <Stat label="Active docs" value={stats?.corpus.activeDocuments ?? "…"} />
         <Stat label="All docs" value={stats?.corpus.totalDocuments ?? "…"} />
