@@ -18,6 +18,25 @@ acronyms:
   fha: Federal Housing Administration
   va: Veterans Affairs
   usda: United States Department of Agriculture
+  # Borrower / broker vocabulary -> guideline vocabulary (Phase 4.7).
+  # These translate the words people use into the words the guidelines use,
+  # so retrieval finds the right row. Edit live from the dashboard Vocabulary screen.
+  duplex: 2-unit two-unit 2-4 units
+  triplex: 3-unit three-unit 2-4 units
+  fourplex: 4-unit four-unit 2-4 units
+  quadplex: 4-unit four-unit 2-4 units
+  owner occupied: principal residence
+  primary residence: principal residence
+  primary: principal residence
+  non-owner occupied: investment property
+  investment: investment property
+  rental: investment property
+  vacation home: second home
+  rate and term: limited cash-out refinance
+  cash out: cash-out refinance
+  condo: condominium project
+  self employed: self-employment income
+  jumbo: non-conforming
 
 programs:
   - program: FHA
