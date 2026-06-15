@@ -6,15 +6,19 @@ services:
     image: pgvector/pgvector:pg16
     container_name: msfg-rag-postgres
     environment:
+      # Read credentials from the repo .env so the database and the app can
+      # never disagree (a hardcoded password here once drifted from .env and
+      # broke startup). Compose auto-loads .env from this directory; the
+      # defaults match application.yml so a missing .env still boots locally.
       POSTGRES_DB: msfg_rag
-      POSTGRES_USER: msfg_rag
-      POSTGRES_PASSWORD: local_dev_only   # local only — never reuse in AWS
+      POSTGRES_USER: ${DB_USERNAME:-msfg_rag}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-local_dev_only}   # local only — never reuse in AWS
     ports:
       - "5433:5432"   # 5433 on host to avoid colliding with any existing local Postgres
     volumes:
       - msfg_rag_pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U msfg_rag -d msfg_rag"]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME:-msfg_rag} -d msfg_rag"]
       interval: 5s
       timeout: 5s
       retries: 10

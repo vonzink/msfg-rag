@@ -13,8 +13,6 @@ const FIELDS = [
   { key: "rerank.enabled", label: "LLM reranking", kind: "toggle" },
 ] as const;
 
-const PROVIDERS = ["anthropic", "openai"];
-
 export default function Settings() {
   const [data, setData] = useState<SettingsResponse | null>(null);
   const [draft, setDraft] = useState<Record<string, string>>({});
@@ -44,6 +42,14 @@ export default function Settings() {
   const effective = (key: string) => String(data.effective[key] ?? "");
   const value = (key: string) => draft[key] ?? effective(key);
   const overridden = Object.keys(data.overrides);
+  const configuredProviders = data.providers.filter((p) => p.configured).map((p) => p.name);
+
+  function providerOptions(selectKey: string) {
+    const current = value(selectKey);
+    const options = [...configuredProviders];
+    if (current && !options.includes(current)) options.unshift(current);
+    return options;
+  }
 
   return (
     <>
@@ -51,6 +57,16 @@ export default function Settings() {
         <h1>Settings</h1>
         <span className="muted">changes go live within ~10 s, no restart</span>
       </header>
+      {data.providers.length > 0 && (
+        <div className="chips">
+          {data.providers.map((p) => (
+            <Pill key={p.name} tone={p.configured ? "green" : "gray"}>
+              {p.configured ? `${p.name} ✓` : `${p.name} — no key`}
+            </Pill>
+          ))}
+          <span className="muted">To activate a provider, add its API key to .env and restart the brain (see RUNBOOK).</span>
+        </div>
+      )}
       <ErrorNote message={error} />
       <div className="card">
         {FIELDS.map((f) => (
@@ -61,7 +77,7 @@ export default function Settings() {
             {f.kind === "select" ? (
               <select value={value(f.key)}
                       onChange={(e) => setDraft({ ...draft, [f.key]: e.target.value })}>
-                {PROVIDERS.map((p) => <option key={p}>{p}</option>)}
+                {providerOptions(f.key).map((p) => <option key={p}>{p}</option>)}
               </select>
             ) : f.kind === "toggle" ? (
               <select value={value(f.key)}

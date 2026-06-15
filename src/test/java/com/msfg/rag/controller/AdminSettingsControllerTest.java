@@ -4,6 +4,7 @@ import com.msfg.rag.service.ai.ModelRouterService;
 import com.msfg.rag.service.ai.RuntimeSettings;
 import org.junit.jupiter.api.Test;
 
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -21,8 +22,8 @@ class AdminSettingsControllerTest {
     private final AdminSettingsController controller =
             new AdminSettingsController(settings, router);
 
-    @Test
-    void getReturnsEffectiveValuesAndOverrides() {
+    private void stubAllSettings() {
+        when(router.providerNames()).thenReturn(Set.of("anthropic", "openai"));
         when(settings.answerProvider()).thenReturn("anthropic");
         when(settings.answerModel()).thenReturn(null);
         when(settings.utilityProvider()).thenReturn("anthropic");
@@ -31,6 +32,11 @@ class AdminSettingsControllerTest {
         when(settings.topK()).thenReturn(8);
         when(settings.rerankEnabled()).thenReturn(true);
         when(settings.overrides()).thenReturn(Map.of());
+    }
+
+    @Test
+    void getReturnsEffectiveValuesAndOverrides() {
+        stubAllSettings();
 
         Map<String, Object> body = controller.get();
 
@@ -39,6 +45,28 @@ class AdminSettingsControllerTest {
         assertEquals("anthropic", effective.get("answer.provider"));
         assertEquals(8, effective.get("retrieval.top-k"));
         assertEquals(Map.of(), body.get("overrides"));
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void getReturnsProvidersBlockInCatalogOrder() {
+        stubAllSettings();
+        when(router.providerNames()).thenReturn(Set.of("anthropic", "openai", "deepseek"));
+
+        Map<String, Object> body = controller.get();
+
+        List<Map<String, Object>> known = (List<Map<String, Object>>) body.get("providers");
+        assertEquals(5, known.size());
+        assertEquals("anthropic", known.get(0).get("name"));
+        assertEquals(true,        known.get(0).get("configured"));
+        assertEquals("openai",    known.get(1).get("name"));
+        assertEquals(true,        known.get(1).get("configured"));
+        assertEquals("deepseek",  known.get(2).get("name"));
+        assertEquals(true,        known.get(2).get("configured"));
+        assertEquals("gemini",    known.get(3).get("name"));
+        assertEquals(false,       known.get(3).get("configured"));
+        assertEquals("grok",      known.get(4).get("name"));
+        assertEquals(false,       known.get(4).get("configured"));
     }
 
     @Test
