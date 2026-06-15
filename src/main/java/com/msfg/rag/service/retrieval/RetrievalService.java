@@ -43,7 +43,7 @@ public class RetrievalService {
     private final ObjectMapper objectMapper;
     private final RagProperties.Retrieval config;
     private final RuntimeSettings settings;
-    private final Map<String, String> acronyms;
+    private final VocabularyService vocabulary;
     private final List<CompiledProgram> programs;
 
     public RetrievalService(DocumentChunkRepository chunkRepository,
@@ -52,14 +52,15 @@ public class RetrievalService {
                             ObjectMapper objectMapper,
                             RagProperties properties,
                             DomainPack pack,
-                            RuntimeSettings settings) {
+                            RuntimeSettings settings,
+                            VocabularyService vocabulary) {
         this.chunkRepository = chunkRepository;
         this.embeddingService = embeddingService;
         this.rerankerService = rerankerService;
         this.objectMapper = objectMapper;
         this.config = properties.retrieval();
         this.settings = settings;
-        this.acronyms = pack.acronymExpansions();
+        this.vocabulary = vocabulary;
         this.programs = compilePrograms(pack.programRules());
     }
 
@@ -93,7 +94,7 @@ public class RetrievalService {
         // retrieves the same definitions as its fully spelled-out phrasing).
         // Only the retrieval inputs use the expansion; program detection and
         // the reranker below still operate on the original question.
-        String expandedQuestion = expandQuery(question, acronyms);
+        String expandedQuestion = expandQuery(question, vocabulary.effectiveSynonyms());
 
         float[] questionEmbedding = embeddingService.embed(expandedQuestion);
         String vectorLiteral = EmbeddingService.toVectorLiteral(questionEmbedding);
