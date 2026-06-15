@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { api } from "../api";
-import { DocumentDto, Stats, SyncReport } from "../types";
+import { DocumentDto, DocumentUpdate, Stats, SyncReport } from "../types";
 import { ErrorNote, Pill, Stat } from "../components";
 
 export default function Corpus({ stats, onCorpusChanged }:
@@ -38,6 +38,38 @@ export default function Corpus({ stats, onCorpusChanged }:
       setError((e as Error).message);
     } finally {
       setAddBusy(false);
+    }
+  }
+
+  const [editing, setEditing] = useState<DocumentDto | null>(null);
+  const [editBusy, setEditBusy] = useState(false);
+  const [editForm, setEditForm] = useState<DocumentUpdate>({
+    title: "", sourceName: "", sourceType: "AGENCY_GUIDELINE",
+    documentVersion: null, effectiveDate: null, expirationDate: null,
+  });
+
+  function openEdit(d: DocumentDto) {
+    setEditing(d);
+    setEditForm({
+      title: d.title, sourceName: d.sourceName, sourceType: d.sourceType,
+      documentVersion: d.documentVersion, effectiveDate: d.effectiveDate,
+      expirationDate: d.expirationDate,
+    });
+  }
+
+  async function submitEdit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!editing || !editForm.title.trim() || !editForm.sourceName.trim()) return;
+    setEditBusy(true);
+    setError(null);
+    try {
+      await api.patch(`/api/ai/documents/${editing.id}`, editForm);
+      setEditing(null);
+      reload(); onCorpusChanged();
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setEditBusy(false);
     }
   }
 
@@ -149,6 +181,7 @@ export default function Corpus({ stats, onCorpusChanged }:
               <td>{d.effectiveDate ?? "—"}</td>
               <td><Pill tone={d.active ? "green" : "gray"}>{d.active ? "active" : "inactive"}</Pill></td>
               <td className="row-actions">
+                <button onClick={() => openEdit(d)}>Edit</button>
                 <button onClick={() => reindex(d)} disabled={busy === d.id}>
                   {busy === d.id ? "Reindexing…" : "Reindex"}
                 </button>
@@ -160,6 +193,42 @@ export default function Corpus({ stats, onCorpusChanged }:
           ))}
         </tbody>
       </table>
+      {editing && (
+        <div className="modal-overlay" onClick={() => setEditing(null)}>
+          <form className="card" onClick={(e) => e.stopPropagation()} onSubmit={submitEdit}
+                style={{ display: "grid", gap: 8, maxWidth: 460, margin: "10vh auto" }}>
+            <h3 style={{ margin: 0 }}>Edit document</h3>
+            <input placeholder="Title" value={editForm.title}
+                   onChange={(e) => setEditForm({ ...editForm, title: e.target.value })} required />
+            <input placeholder="Source name" value={editForm.sourceName}
+                   onChange={(e) => setEditForm({ ...editForm, sourceName: e.target.value })} required />
+            <select value={editForm.sourceType}
+                    onChange={(e) => setEditForm({ ...editForm, sourceType: e.target.value })}>
+              <option value="AGENCY_GUIDELINE">agency guideline</option>
+              <option value="INTERNAL_POLICY">internal policy</option>
+              <option value="INVESTOR_OVERLAY">investor overlay</option>
+              <option value="EDUCATIONAL">educational</option>
+            </select>
+            <input placeholder="Version" value={editForm.documentVersion ?? ""}
+                   onChange={(e) => setEditForm({ ...editForm, documentVersion: e.target.value || null })} />
+            <input type="date" value={editForm.effectiveDate ?? ""}
+                   onChange={(e) => setEditForm({ ...editForm, effectiveDate: e.target.value || null })} />
+            <input type="date" value={editForm.expirationDate ?? ""}
+                   onChange={(e) => setEditForm({ ...editForm, expirationDate: e.target.value || null })} />
+            <p className="muted" style={{ fontSize: 12 }}>
+              Updates the document record. Existing search chunks keep their old metadata
+              until you <strong>Reindex</strong> this document.
+            </p>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button className="btn-primary" type="submit"
+                      disabled={editBusy || !editForm.title.trim() || !editForm.sourceName.trim()}>
+                {editBusy ? "Saving…" : "Save"}
+              </button>
+              <button type="button" onClick={() => setEditing(null)}>Cancel</button>
+            </div>
+          </form>
+        </div>
+      )}
     </>
   );
 }
