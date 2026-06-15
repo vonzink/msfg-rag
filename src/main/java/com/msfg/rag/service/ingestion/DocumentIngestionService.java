@@ -109,9 +109,10 @@ public class DocumentIngestionService {
 
     /**
      * Hard-deletes a document: its chunks, its stored file, and the row.
-     * Chunk + row removals are transactional; the file delete runs last so a
-     * storage error does not block the DB cleanup, and a null storage key
-     * (a document with no stored file) is skipped.
+     * The whole operation is transactional — if the file delete fails, the
+     * chunk and row deletes roll back too, so a document is never left
+     * half-removed. A null storage key (a document with no stored file) is
+     * skipped.
      */
     @Transactional
     public void delete(UUID documentId) {
