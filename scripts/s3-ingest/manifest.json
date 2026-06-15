@@ -1,0 +1,71 @@
+{
+  "_comment": "Per-file ingestion metadata for the rag-brain/ corpus. Source of truth lives in S3 as rag-brain/_manifest.json; this local copy is the fallback. sourceType: AGENCY_GUIDELINE | INTERNAL_POLICY | INVESTOR_OVERLAY | EDUCATIONAL. Set ingest:false to keep a file in S3 but out of the brain.",
+  "defaults": { "sourceName": "MSFG Knowledge Base", "sourceType": "AGENCY_GUIDELINE" },
+  "files": {
+    "loandoc.md": {
+      "title": "Mortgage Document Matrix",
+      "sourceName": "MSFG Knowledge Base",
+      "sourceType": "EDUCATIONAL"
+    },
+    "fannie_mae_eligibility_matrix_rag.md": {
+      "title": "Fannie Mae Eligibility Matrix",
+      "sourceName": "Fannie Mae",
+      "sourceType": "AGENCY_GUIDELINE",
+      "documentVersion": "2026-04-01",
+      "effectiveDate": "2026-04-01"
+    },
+    "fannie_mae_llpa_matrix_rag.md": {
+      "title": "Fannie Mae LLPA Matrix",
+      "sourceName": "Fannie Mae",
+      "sourceType": "AGENCY_GUIDELINE",
+      "documentVersion": "2026-01-28",
+      "effectiveDate": "2026-01-28"
+    },
+    "MSFG_Loan_Officers.md": {
+      "title": "MSFG Loan Officers",
+      "sourceName": "Mountain State Financial Group",
+      "sourceType": "INTERNAL_POLICY"
+    },
+    "500 common questions.md": {
+      "title": "500 Common Mortgage Questions",
+      "sourceName": "MSFG Knowledge Base",
+      "sourceType": "EDUCATIONAL"
+    },
+    "FHA handbook.pdf": {
+      "title": "FHA Single Family Housing Policy Handbook (4000.1)",
+      "sourceName": "HUD / FHA",
+      "sourceType": "AGENCY_GUIDELINE"
+    },
+    "Va buyers guide.pdf": {
+      "title": "VA Home Buyer's Guide",
+      "sourceName": "U.S. Dept. of Veterans Affairs",
+      "sourceType": "AGENCY_GUIDELINE"
+    },
+    "fannie mae sellers guide.pdf": {
+      "title": "Fannie Mae Selling Guide",
+      "sourceName": "Fannie Mae",
+      "sourceType": "AGENCY_GUIDELINE"
+    },
+    "MI.pdf": {
+      "title": "Mortgage Insurance Guidelines",
+      "sourceName": "Mortgage Insurance",
+      "sourceType": "AGENCY_GUIDELINE"
+    },
+    "Fannie Mae Eligibility Matrix.pdf": {
+      "ingest": false,
+      "reason": "duplicate of fannie_mae_eligibility_matrix_rag.md — keep the RAG markdown"
+    },
+    "LLPA matrix.pdf": {
+      "ingest": false,
+      "reason": "duplicate of fannie_mae_llpa_matrix_rag.md — keep the RAG markdown"
+    },
+    "MI Guidelines.webp": {
+      "ingest": false,
+      "reason": "image; brain has no OCR — needs a text/markdown version"
+    },
+    "Loan Limit Look-Up Table 2026 final.xlsx": {
+      "ingest": false,
+      "reason": "xlsx unsupported by the brain — convert to a markdown table or a structured lookup tool"
+    }
+  }
+}
