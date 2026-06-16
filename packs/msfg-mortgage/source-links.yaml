@@ -1,0 +1,81 @@
+# Optional pack seed for the source-link registry (spec §6.1). Loaded by
+# DomainPackLoader.readOptional and seeded into brain_source_links on first boot
+# only when the table is empty. Removing this file reproduces today's behavior
+# (empty registry). Keys are kebab-case; authority/surface use the exact enum
+# names PRIMARY|SECONDARY|BACKGROUND and PUBLIC|INTERNAL|BOTH.
+links:
+  - name: "Fannie Mae Selling Guide"
+    url: "https://selling-guide.fanniemae.com/"
+    domain: "fanniemae.com"
+    authority: PRIMARY
+    topics:
+      - conventional
+      - conforming
+      - underwriting
+      - appraisal
+    freshness-required: true
+    allowed-use:
+      - "cite conventional underwriting and eligibility requirements"
+    do-not-use-for:
+      - "FHA, VA, or USDA program rules"
+    surface: BOTH
+
+  - name: "Freddie Mac Single-Family Seller/Servicer Guide"
+    url: "https://guide.freddiemac.com/"
+    domain: "freddiemac.com"
+    authority: PRIMARY
+    topics:
+      - conventional
+      - conforming
+      - servicing
+    freshness-required: true
+    allowed-use:
+      - "cite conventional seller/servicer requirements"
+    do-not-use-for:
+      - "government loan program rules"
+    surface: BOTH
+
+  - name: "HUD Handbook 4000.1 (FHA Single Family Housing Policy Handbook)"
+    url: "https://www.hud.gov/program_offices/housing/sfh/handbook_4000-1"
+    domain: "hud.gov"
+    authority: PRIMARY
+    topics:
+      - fha
+      - government
+      - underwriting
+    freshness-required: true
+    allowed-use:
+      - "cite FHA origination and underwriting policy"
+    do-not-use-for:
+      - "conventional or VA program rules"
+    surface: BOTH
+
+  - name: "VA Lender's Handbook (M26-7)"
+    url: "https://www.benefits.va.gov/warms/pam26_7.asp"
+    domain: "benefits.va.gov"
+    authority: PRIMARY
+    topics:
+      - va
+      - government
+      - eligibility
+    freshness-required: true
+    allowed-use:
+      - "cite VA loan eligibility and underwriting requirements"
+    do-not-use-for:
+      - "conventional or FHA program rules"
+    surface: BOTH
+
+  - name: "USDA Single Family Housing Guaranteed Loan Program Handbook (HB-1-3555)"
+    url: "https://www.rd.usda.gov/resources/directives/handbooks"
+    domain: "rd.usda.gov"
+    authority: PRIMARY
+    topics:
+      - usda
+      - rural-development
+      - government
+    freshness-required: true
+    allowed-use:
+      - "cite USDA guaranteed loan program requirements"
+    do-not-use-for:
+      - "conventional, FHA, or VA program rules"
+    surface: BOTH
