@@ -23,6 +23,13 @@ public record AskRequest(
         String loanType,               // optional context, e.g. "conventional"
 
         @Size(max = 2)
-        String state                   // optional, e.g. "CO"
+        String state,                  // optional, e.g. "CO"
+
+        @Size(max = 200)
+        String pageRoute,              // optional: page the visitor is on, e.g. "/loan-options"
+
+        @Size(max = 20)
+        String surface                 // optional audience: "PUBLIC" | "INTERNAL" | "BOTH"
+                                       // (bound as String; valueOf'd in-service for a clean 400)
 ) {
 }

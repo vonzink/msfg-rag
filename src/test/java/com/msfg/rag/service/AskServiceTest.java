@@ -124,7 +124,7 @@ class AskServiceTest {
     }
 
     private AskRequest pmiQuestion() {
-        return new AskRequest(null, "session-1", "What is PMI?", null, null);
+        return new AskRequest(null, "session-1", "What is PMI?", null, null, null, null);
     }
 
     @ParameterizedTest
