@@ -190,4 +190,107 @@ class PageGuideServiceTest {
         service.activePageGuides();
         verify(repo, times(2)).findByActiveTrueOrderByCreatedAtDescIdDesc();  // reloaded after invalidate
     }
+
+    // ---- match() : deterministic route + topic matching (Phase 6) -------
+
+    private BrainPageGuide guide(String route, Surface surface, List<String> topics) {
+        return new BrainPageGuide(
+                route, "Title", "Purpose", surface,
+                List.of(), List.of(), List.of(), List.of(), topics, "seed");
+    }
+
+    @Test
+    void matchByExactRoute() {
+        BrainPageGuide fha = guide("/loans/fha", Surface.BOTH, List.of("fha"));
+        BrainPageGuide va = guide("/loans/va", Surface.BOTH, List.of("va"));
+        when(repo.findByActiveTrueOrderByCreatedAtDescIdDesc()).thenReturn(List.of(fha, va));
+
+        List<BrainPageGuide> matches = service.match("/loans/fha", "anything", null);
+
+        assertEquals(1, matches.size());
+        assertEquals("/loans/fha", matches.get(0).getRoute());
+    }
+
+    @Test
+    void matchRouteIsCaseInsensitiveAndTrimmed() {
+        BrainPageGuide fha = guide("/loans/fha", Surface.BOTH, List.of("fha"));
+        when(repo.findByActiveTrueOrderByCreatedAtDescIdDesc()).thenReturn(List.of(fha));
+
+        assertEquals(1, service.match("  /LOANS/FHA  ", "x", null).size());
+    }
+
+    @Test
+    void matchByTopicSubstring() {
+        BrainPageGuide fha = guide("/loans/fha", Surface.BOTH, List.of("fha"));
+        BrainPageGuide va = guide("/loans/va", Surface.BOTH, List.of("va"));
+        when(repo.findByActiveTrueOrderByCreatedAtDescIdDesc()).thenReturn(List.of(fha, va));
+
+        // No pageRoute; topic "fha" is a substring of the question.
+        List<BrainPageGuide> matches = service.match(null, "What is an FHA loan?", null);
+
+        assertEquals(1, matches.size());
+        assertEquals("/loans/fha", matches.get(0).getRoute());
+    }
+
+    @Test
+    void matchRouteFirstThenTopicAndDeDupes() {
+        // duplexGuide matches BOTH route and topic ("duplex") — must appear once,
+        // first (route-exact ordered ahead of topic-only matches).
+        BrainPageGuide duplexGuide = guide("/loans/duplex", Surface.BOTH, List.of("duplex"));
+        BrainPageGuide fhaGuide = guide("/loans/fha", Surface.BOTH, List.of("fha"));
+        when(repo.findByActiveTrueOrderByCreatedAtDescIdDesc())
+                .thenReturn(List.of(duplexGuide, fhaGuide));
+
+        // Question contains both "duplex" (duplexGuide topic + route hit) and "fha".
+        List<BrainPageGuide> matches =
+                service.match("/loans/duplex", "fha rules for a duplex", null);
+
+        assertEquals(2, matches.size());
+        assertEquals("/loans/duplex", matches.get(0).getRoute());   // route-exact first
+        assertEquals("/loans/fha", matches.get(1).getRoute());      // topic-only second
+    }
+
+    @Test
+    void matchSurfacePublicKeepsPublicAndBothExcludesInternal() {
+        BrainPageGuide pub = guide("/p", Surface.PUBLIC, List.of("alpha"));
+        BrainPageGuide both = guide("/b", Surface.BOTH, List.of("alpha"));
+        BrainPageGuide internal = guide("/i", Surface.INTERNAL, List.of("alpha"));
+        when(repo.findByActiveTrueOrderByCreatedAtDescIdDesc())
+                .thenReturn(List.of(pub, both, internal));
+
+        List<BrainPageGuide> matches = service.match(null, "alpha topic", "PUBLIC");
+
+        assertEquals(2, matches.size());
+        assertTrue(matches.stream().anyMatch(g -> g.getSurface() == Surface.PUBLIC));
+        assertTrue(matches.stream().anyMatch(g -> g.getSurface() == Surface.BOTH));
+        assertTrue(matches.stream().noneMatch(g -> g.getSurface() == Surface.INTERNAL));
+    }
+
+    @Test
+    void matchNullSurfaceKeepsAllSurfaces() {
+        BrainPageGuide pub = guide("/p", Surface.PUBLIC, List.of("alpha"));
+        BrainPageGuide internal = guide("/i", Surface.INTERNAL, List.of("alpha"));
+        when(repo.findByActiveTrueOrderByCreatedAtDescIdDesc())
+                .thenReturn(List.of(pub, internal));
+
+        assertEquals(2, service.match(null, "alpha topic", null).size());
+    }
+
+    @Test
+    void matchBlankQuestionAndBlankRouteIsEmpty() {
+        BrainPageGuide fha = guide("/loans/fha", Surface.BOTH, List.of("fha"));
+        when(repo.findByActiveTrueOrderByCreatedAtDescIdDesc()).thenReturn(List.of(fha));
+
+        assertTrue(service.match("   ", "   ", null).isEmpty());
+        assertTrue(service.match(null, null, null).isEmpty());
+    }
+
+    @Test
+    void matchBadSurfaceThrowsIllegalArgumentException() {
+        BrainPageGuide fha = guide("/loans/fha", Surface.BOTH, List.of("fha"));
+        when(repo.findByActiveTrueOrderByCreatedAtDescIdDesc()).thenReturn(List.of(fha));
+
+        assertThrows(IllegalArgumentException.class,
+                () -> service.match(null, "fha", "SIDEWAYS"));
+    }
 }
