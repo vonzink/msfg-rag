@@ -17,7 +17,7 @@ import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
 
 /**
- * Reads the five required YAML files (plus an optional source-links.yaml) of a domain pack directory into a DomainPack.
+ * Reads the five required YAML files (plus optional source-links.yaml and page-guides.yaml) of a domain pack directory into a DomainPack.
  * Throws PackValidationException naming the exact file (and field) on any
  * problem — the application must fail to boot rather than run with a partial
  * compliance layer.
@@ -43,6 +43,11 @@ public class DomainPackLoader {
                                   List<String> topics, boolean freshnessRequired,
                                   List<String> allowedUse, List<String> doNotUseFor,
                                   String surface) {}
+    private record PageGuidesFile(List<PageGuideFile> guides) {}
+    private record PageGuideFile(String route, String title, String purpose, String surface,
+                                 List<String> userIntents, List<String> allowedGuidance,
+                                 List<InternalLinkFile> internalLinks, List<String> topics) {}
+    private record InternalLinkFile(String label, String url) {}
 
     public DomainPack load(Path packDir) {
         PackFile packFile = read(packDir, "pack.yaml", PackFile.class);
@@ -51,6 +56,7 @@ public class DomainPackLoader {
         ClassifierFile classifierFile = read(packDir, "classifier.yaml", ClassifierFile.class);
         RetrievalFile retrievalFile = read(packDir, "retrieval.yaml", RetrievalFile.class);
         SourceLinksFile sourceLinksFile = readOptional(packDir, "source-links.yaml", SourceLinksFile.class);
+        PageGuidesFile pageGuidesFile = readOptional(packDir, "page-guides.yaml", PageGuidesFile.class);
 
         // Element-level checks BEFORE assembly: List.copyOf/Map.copyOf in the
         // record constructors reject null elements with a bare NPE, which
@@ -116,6 +122,17 @@ public class DomainPackLoader {
                                         s.name(), s.url(), s.domain(), s.authority(),
                                         s.topics(), s.freshnessRequired(),
                                         s.allowedUse(), s.doNotUseFor(), s.surface()))
+                                .toList(),
+                (pageGuidesFile == null || pageGuidesFile.guides() == null) ? List.of()
+                        : pageGuidesFile.guides().stream()
+                                .map(g -> new DomainPack.PageGuide(
+                                        g.route(), g.title(), g.purpose(), g.surface(),
+                                        g.userIntents(), g.allowedGuidance(),
+                                        g.internalLinks() == null ? List.of()
+                                                : g.internalLinks().stream()
+                                                        .map(l -> new DomainPack.InternalLink(l.label(), l.url()))
+                                                        .toList(),
+                                        g.topics()))
                                 .toList());
 
         validate(packDir, pack);

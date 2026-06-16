@@ -7,6 +7,7 @@ import Settings from "./screens/Settings";
 import Rules from "./screens/Rules";
 import Vocabulary from "./screens/Vocabulary";
 import SourceLinks from "./screens/SourceLinks";
+import PageGuides from "./screens/PageGuides";
 import TestConsole from "./screens/TestConsole";
 import Audit from "./screens/Audit";
 
@@ -65,6 +66,7 @@ export default function App() {
             <NavLink to="/rules">Rules</NavLink>
             <NavLink to="/vocabulary">Vocabulary</NavLink>
             <NavLink to="/source-links">Source links</NavLink>
+            <NavLink to="/page-guides">Page guides</NavLink>
             <NavLink to="/console">Test console</NavLink>
             <NavLink to="/audit">Audit</NavLink>
           </nav>
@@ -80,6 +82,7 @@ export default function App() {
             <Route path="/rules" element={<Rules />} />
             <Route path="/vocabulary" element={<Vocabulary />} />
             <Route path="/source-links" element={<SourceLinks />} />
+            <Route path="/page-guides" element={<PageGuides />} />
             <Route path="/console" element={<TestConsole slug={stats?.brain.slug ?? "mortgage"} />} />
             <Route path="/audit" element={<Audit />} />
             <Route path="*" element={<Navigate to="/corpus" replace />} />

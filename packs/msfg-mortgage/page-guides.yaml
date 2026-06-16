@@ -1,0 +1,71 @@
+# Optional pack seed for the page-guide registry (spec §6.1). Loaded by
+# DomainPackLoader.readOptional and seeded into brain_page_guides on first boot
+# only when the table is empty. Removing this file reproduces today's behavior
+# (empty registry). Keys are kebab-case; surface uses the exact enum names
+# PUBLIC|INTERNAL|BOTH. internal-links are inline [{label,url}] objects.
+#
+# NOTE: source-link-ids is intentionally EMPTY for every seed guide. Source links
+# are seeded into brain_source_links with freshly generated UUIDs at first boot,
+# so a literal UUID here could not reference a real row. Attach source links to
+# guides AFTER boot via the dashboard Page Guides screen (the source-link
+# multi-select). This file therefore omits source-link-ids entirely (defaults to []).
+guides:
+  - route: "/loans/fha"
+    title: "FHA Loans"
+    purpose: "Explain FHA loan basics and direct the user toward FHA eligibility and next steps."
+    surface: BOTH
+    user-intents:
+      - "understand FHA loans"
+      - "FHA down payment"
+      - "FHA credit requirements"
+    allowed-guidance:
+      - "explain the 3.5% minimum down payment for qualifying credit scores"
+      - "explain that FHA loans require mortgage insurance (UFMIP and annual MIP)"
+    internal-links:
+      - label: "Start an FHA application"
+        url: "/apply?program=fha"
+      - label: "FHA eligibility checklist"
+        url: "/loans/fha/eligibility"
+    topics:
+      - fha
+      - government
+      - down-payment
+
+  - route: "/loans/conventional"
+    title: "Conventional Loans"
+    purpose: "Explain conventional (Fannie/Freddie) loan basics and direct the user toward conforming options."
+    surface: BOTH
+    user-intents:
+      - "understand conventional loans"
+      - "conforming loan limits"
+      - "private mortgage insurance"
+    allowed-guidance:
+      - "explain that conventional loans follow Fannie Mae / Freddie Mac guidelines"
+      - "explain that PMI may be required below 20% down and can typically be removed later"
+    internal-links:
+      - label: "Compare conventional vs FHA"
+        url: "/loans/compare"
+    topics:
+      - conventional
+      - conforming
+      - pmi
+
+  - route: "/loans/duplex"
+    title: "2-4 Unit (Duplex) Properties"
+    purpose: "Explain financing for 2-4 unit / duplex properties and point the user to multi-unit guidance."
+    surface: BOTH
+    user-intents:
+      - "buy a duplex"
+      - "2-unit property financing"
+      - "rental income from a multi-unit home"
+    allowed-guidance:
+      - "explain that 2-4 unit properties are eligible under several programs with program-specific rules"
+      - "explain that owner-occupied multi-unit properties may use the principal residence guidelines"
+    internal-links:
+      - label: "Multi-unit eligibility"
+        url: "/loans/multi-unit"
+    topics:
+      - duplex
+      - 2-unit
+      - multi-unit
+      - investment

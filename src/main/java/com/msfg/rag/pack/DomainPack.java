@@ -7,9 +7,10 @@ import java.util.Map;
 
 /**
  * Everything company-specific about one brain, loaded from a pack directory
- * at boot (five required files plus an optional source-links.yaml; see DomainPackLoader).
+ * at boot (five required files plus optional source-links.yaml and page-guides.yaml; see DomainPackLoader).
  * Immutable; services inject this instead of holding their own constants.
  * Source links default to an empty list when the optional file is absent.
+ * Page guides likewise default to an empty list when the optional file is absent.
  * Spec: docs/superpowers/specs/
  * 2026-06-10-rag-brain-platform-design.md §4.
  */
@@ -24,7 +25,8 @@ public record DomainPack(
         List<ClassifierRule> classifierRules,
         Map<String, String> acronymExpansions,
         List<ProgramRule> programRules,
-        List<SourceLink> sourceLinks
+        List<SourceLink> sourceLinks,
+        List<PageGuide> pageGuides
 ) {
 
     public DomainPack {
@@ -32,6 +34,7 @@ public record DomainPack(
         acronymExpansions = acronymExpansions == null ? null : Map.copyOf(acronymExpansions);
         programRules = programRules == null ? null : List.copyOf(programRules);
         sourceLinks = sourceLinks == null ? List.of() : List.copyOf(sourceLinks);
+        pageGuides = pageGuides == null ? List.of() : List.copyOf(pageGuides);
     }
 
     public record Guardrails(
@@ -95,4 +98,32 @@ public record DomainPack(
             doNotUseFor = doNotUseFor == null ? List.of() : List.copyOf(doNotUseFor);
         }
     }
+
+    /**
+     * One optional page-guide registry seed entry from page-guides.yaml. surface
+     * is the enum NAME (PUBLIC|INTERNAL|BOTH); the first-boot seeder converts it
+     * via valueOf. route may be null (topic-matched only). sourceLinkIds is
+     * always empty in pack seeds (links are attached later via the dashboard,
+     * because seeded source-link UUIDs are not known at YAML-authoring time).
+     */
+    public record PageGuide(
+            String route,
+            String title,
+            String purpose,
+            String surface,
+            List<String> userIntents,
+            List<String> allowedGuidance,
+            List<InternalLink> internalLinks,
+            List<String> topics
+    ) {
+        public PageGuide {
+            userIntents = userIntents == null ? List.of() : List.copyOf(userIntents);
+            allowedGuidance = allowedGuidance == null ? List.of() : List.copyOf(allowedGuidance);
+            internalLinks = internalLinks == null ? List.of() : List.copyOf(internalLinks);
+            topics = topics == null ? List.of() : List.copyOf(topics);
+        }
+    }
+
+    /** One inline internal link ({label,url}) on a page-guide seed. */
+    public record InternalLink(String label, String url) {}
 }
