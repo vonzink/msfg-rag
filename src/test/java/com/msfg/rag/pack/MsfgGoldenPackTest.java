@@ -269,6 +269,45 @@ class MsfgGoldenPackTest {
     }
 
     @Test
+    void pageGuidesMatchSeed() {
+        List<DomainPack.PageGuide> guides = PACK.pageGuides();
+        assertEquals(3, guides.size());
+
+        DomainPack.PageGuide fha = guides.get(0);
+        assertEquals("/loans/fha", fha.route());
+        assertEquals("FHA Loans", fha.title());
+        assertEquals(
+                "Explain FHA loan basics and direct the user toward FHA eligibility and next steps.",
+                fha.purpose());
+        assertEquals("BOTH", fha.surface());
+        assertEquals(List.of("understand FHA loans", "FHA down payment", "FHA credit requirements"),
+                fha.userIntents());
+        assertEquals(List.of(
+                "explain the 3.5% minimum down payment for qualifying credit scores",
+                "explain that FHA loans require mortgage insurance (UFMIP and annual MIP)"),
+                fha.allowedGuidance());
+        assertEquals(List.of(
+                new DomainPack.InternalLink("Start an FHA application", "/apply?program=fha"),
+                new DomainPack.InternalLink("FHA eligibility checklist", "/loans/fha/eligibility")),
+                fha.internalLinks());
+        assertEquals(List.of("fha", "government", "down-payment"), fha.topics());
+
+        assertEquals("/loans/conventional", guides.get(1).route());
+        assertEquals("Conventional Loans", guides.get(1).title());
+        assertEquals("BOTH", guides.get(1).surface());
+
+        assertEquals("/loans/duplex", guides.get(2).route());
+        assertEquals("2-4 Unit (Duplex) Properties", guides.get(2).title());
+        assertEquals(List.of("duplex", "2-unit", "multi-unit", "investment"), guides.get(2).topics());
+
+        // every seeded guide must have a non-blank title and a non-blank purpose
+        for (var guide : guides) {
+            assertFalse(guide.title() == null || guide.title().isBlank(), "every page guide has a title");
+            assertFalse(guide.purpose() == null || guide.purpose().isBlank(), "every page guide has a purpose");
+        }
+    }
+
+    @Test
     void retrievalRulesMatchLegacy() {
         // Full acronym map — 30 entries
         assertEquals(Map.ofEntries(
