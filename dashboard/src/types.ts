@@ -25,9 +25,14 @@ export interface Citation {
   source_name: string | null; document_name: string | null;
   section: string | null; page_number: string | null; effective_date: string | null;
 }
+export interface RecommendedPage { route: string; label: string }
+export interface Link { name: string; url: string; authority: string }
 export interface AskResponse {
   conversationId: string; answer: string; citations: Citation[];
   confidence: number; humanEscalationRequired: boolean; disclaimer: string;
+  recommendedPage?: RecommendedPage | null;
+  links?: Link[] | null;
+  nextAction?: string | null;
 }
 
 export interface RetrievedChunk {

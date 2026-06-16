@@ -63,6 +63,25 @@ export default function TestConsole({ slug }: { slug: string }) {
               ))}
             </ul>
           )}
+          {answer.recommendedPage && (
+            <p className="recommended-page">
+              Recommended page: <strong>{answer.recommendedPage.label}</strong>{" "}
+              <span className="muted">{answer.recommendedPage.route}</span>
+            </p>
+          )}
+          {answer.links && answer.links.length > 0 && (
+            <ul className="sources">
+              {answer.links.map((l, i) => (
+                <li key={i}>
+                  <a href={l.url} target="_blank" rel="noreferrer">{l.name}</a>{" "}
+                  <Pill tone="blue">{l.authority}</Pill>
+                </li>
+              ))}
+            </ul>
+          )}
+          {answer.nextAction && (
+            <p className="next-action">Next action: {answer.nextAction}</p>
+          )}
           <p className="muted">{answer.disclaimer}</p>
         </div>
       )}
