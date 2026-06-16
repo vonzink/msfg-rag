@@ -100,3 +100,38 @@ export interface SourceLinkRequest {
   doNotUseFor: string[];
   surface: string;
 }
+
+export interface LinkRef {
+  label: string;
+  url: string;
+}
+
+export interface PageGuideDto {
+  id: string;
+  route: string | null;
+  title: string;
+  purpose: string;
+  surface: string;
+  user_intents: string[];
+  allowed_guidance: string[];
+  internal_links: LinkRef[];
+  source_link_ids: string[];
+  topics: string[];
+  active: boolean;
+  created_at: string | null;
+  created_by: string | null;
+  updated_at: string | null;
+  updated_by: string | null;
+}
+
+export interface PageGuideRequest {
+  route: string | null;
+  title: string;
+  purpose: string;
+  surface: string;
+  userIntents: string[];
+  allowedGuidance: string[];
+  internalLinks: LinkRef[];
+  sourceLinkIds: string[];
+  topics: string[];
+}
