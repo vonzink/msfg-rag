@@ -21,6 +21,9 @@ import com.msfg.rag.service.ai.PromptBuilderService;
 import com.msfg.rag.service.ai.QuestionCategory;
 import com.msfg.rag.service.ai.QuestionClassifierService;
 import com.msfg.rag.service.audit.AuditLogService;
+import com.msfg.rag.service.retrieval.PlannedEvidence;
+import com.msfg.rag.service.retrieval.RetrievalPlan;
+import com.msfg.rag.service.retrieval.RetrievalPlannerService;
 import com.msfg.rag.service.retrieval.RetrievalResult;
 import com.msfg.rag.service.retrieval.RetrievalService;
 import com.msfg.rag.service.retrieval.RetrievedChunk;
@@ -58,6 +61,7 @@ public class AskService {
     private final AnswerSourceRepository answerSourceRepository;
     private final ObjectMapper objectMapper;
     private final IntentRouterService intentRouterService;
+    private final RetrievalPlannerService retrievalPlannerService;
 
     public AskService(DomainPack pack,
                       QuestionClassifierService questionClassifierService,
@@ -70,7 +74,8 @@ public class AskService {
                       MessageRepository messageRepository,
                       AnswerSourceRepository answerSourceRepository,
                       ObjectMapper objectMapper,
-                      IntentRouterService intentRouterService) {
+                      IntentRouterService intentRouterService,
+                      RetrievalPlannerService retrievalPlannerService) {
         this.canned = pack.guardrails().cannedAnswers();
         this.questionClassifierService = questionClassifierService;
         this.retrievalService = retrievalService;
@@ -83,6 +88,7 @@ public class AskService {
         this.answerSourceRepository = answerSourceRepository;
         this.objectMapper = objectMapper;
         this.intentRouterService = intentRouterService;
+        this.retrievalPlannerService = retrievalPlannerService;
     }
 
     @Transactional
@@ -107,7 +113,15 @@ public class AskService {
         log.info("Routed question to intent {} (pageRoute={}, surface={})",
                 intent, request.pageRoute(), request.surface());
 
-        // 1. Retrieve approved source context.
+        // Planning seam (Phase 6): decide which indexes this question hits. plan()
+        // is pure (no I/O, no surface parse) — for the default (GUIDELINE_QUESTION,
+        // no pageRoute) it is exactly {CORPUS} = today. Side indexes (page guides /
+        // link registry) are COLLECTED below on the proceed path and logged only;
+        // nothing here changes the corpus retrieval, prompt, model, or response.
+        RetrievalPlan plan = retrievalPlannerService.plan(
+                intent, request.pageRoute(), request.surface());
+
+        // 1. Retrieve approved source context. (Unchanged — raw question, corpus index.)
         RetrievalResult retrieval = retrievalService.retrieve(request.question());
 
         // 2. Refuse early when there is no reliable source material.
@@ -115,6 +129,16 @@ public class AskService {
             return refuse(conversation, request, retrieval, canned.noSource(), null,
                     "insufficient evidence");
         }
+
+        // Collect seam (Phase 6): gather matching page guides + source links for
+        // the planned side indexes. INERT — collected + logged only; NOT passed to
+        // the prompt, the model, the validator, or the AskResponse. Phase 8 will
+        // consume this to emit recommendedPage/links/nextAction. Runs only on the
+        // proceed path so refusal semantics stay byte-identical to today.
+        PlannedEvidence sideEvidence = retrievalPlannerService.collect(
+                plan, request.question(), request.pageRoute(), request.surface());
+        log.info("Planned side-evidence: guides={}, links={}, indexes={}",
+                sideEvidence.pageGuides().size(), sideEvidence.links().size(), plan.indexes());
 
         // 3. Build the locked prompt and call the model (with fallback).
         String prompt = promptBuilderService.build(request.question(), retrieval.chunks());
