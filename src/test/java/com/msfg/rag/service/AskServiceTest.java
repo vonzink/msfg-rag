@@ -10,6 +10,7 @@ import com.msfg.rag.repository.ConversationRepository;
 import com.msfg.rag.repository.MessageRepository;
 import com.msfg.rag.pack.TestPacks;
 import com.msfg.rag.service.ai.AnswerValidationService;
+import com.msfg.rag.service.ai.IntentRouterService;
 import com.msfg.rag.service.ai.ModelAnswer;
 import com.msfg.rag.service.ai.ModelRouterService;
 import com.msfg.rag.service.ai.PromptBuilderService;
@@ -30,12 +31,16 @@ import java.util.UUID;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.atLeast;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import org.mockito.ArgumentCaptor;
 
 /**
  * Tests for the AskService pipeline and its citation-salvage helpers.
@@ -49,6 +54,9 @@ import static org.mockito.Mockito.when;
  * never the model's raw refusal text decorated with backfilled citations.
  */
 class AskServiceTest {
+
+    /** Promoted to a field so tests can call verify(retrieval, ...) after calling ask(). */
+    private RetrievalService retrieval;
 
     private RetrievedChunk chunk(String sourceName, String documentName,
                                  String section, Integer pageNumber, LocalDate effectiveDate) {
@@ -68,7 +76,7 @@ class AskServiceTest {
         QuestionClassifierService classifier = mock(QuestionClassifierService.class);
         when(classifier.classify(anyString())).thenReturn(QuestionCategory.EDUCATIONAL);
 
-        RetrievalService retrieval = mock(RetrievalService.class);
+        retrieval = mock(RetrievalService.class);
         when(retrieval.retrieve(anyString()))
                 .thenReturn(new RetrievalResult(chunks, 1.0, true));
 
@@ -92,7 +100,8 @@ class AskServiceTest {
 
         return new AskService(TestPacks.msfg(), classifier, retrieval, promptBuilder, router,
                 new AnswerValidationService(TestPacks.msfg()), audit,
-                conversations, messages, sources, new ObjectMapper());
+                conversations, messages, sources, new ObjectMapper(),
+                new IntentRouterService());
     }
 
     /** Builds an AskService that classifies every question as {@code category}. */
@@ -120,11 +129,12 @@ class AskServiceTest {
 
         return new AskService(TestPacks.msfg(), classifier, retrieval, promptBuilder, router,
                 new AnswerValidationService(TestPacks.msfg()), audit,
-                conversations, messages, sources, new ObjectMapper());
+                conversations, messages, sources, new ObjectMapper(),
+                new IntentRouterService());
     }
 
     private AskRequest pmiQuestion() {
-        return new AskRequest(null, "session-1", "What is PMI?", null, null);
+        return new AskRequest(null, "session-1", "What is PMI?", null, null, null, null);
     }
 
     @ParameterizedTest
@@ -268,5 +278,64 @@ class AskServiceTest {
 
         // The model cited its own sources; do not overwrite them with the chunks.
         assertEquals(modelCitations, result.citations());
+    }
+
+    /** A PMI question that also carries an optional pageRoute and surface. */
+    private AskRequest pmiQuestionWith(String pageRoute, String surface) {
+        return new AskRequest(null, "session-1", "What is PMI?", null, null, pageRoute, surface);
+    }
+
+    @Test
+    void pageRouteDoesNotChangeTheAnswer() {
+        // One AskService instance; intent is computed + logged only — must not
+        // alter the produced answer or leak into the retrieval question string.
+        String groundedJson = """
+                {"answer":"PMI is private mortgage insurance that may be required on conventional loans.",
+                 "citations":[],
+                 "confidence":0.85,
+                 "human_escalation_required":false,
+                 "disclaimer":"d"}""";
+        List<RetrievedChunk> chunks = List.of(
+                chunk("Fannie Mae Selling Guide", "selling-guide.pdf", "B7-1", 1, LocalDate.of(2026, 1, 1)),
+                chunk("Fannie Mae Selling Guide", "selling-guide.pdf", "B7-2", 2, LocalDate.of(2026, 1, 1)));
+
+        // Re-use a single service + a single stubbed retrieval mock for both calls.
+        AskService service = askServiceReturning(groundedJson, chunks);
+
+        AskResponse without  = service.ask(pmiQuestion());
+        AskResponse withPage = service.ask(pmiQuestionWith("/loan-options", "PUBLIC"));
+
+        assertEquals(without.answer(), withPage.answer(),
+                "pageRoute/surface must not change the answer in Phase 5");
+        assertEquals(without.citations().size(), withPage.citations().size());
+        assertEquals(without.humanEscalationRequired(), withPage.humanEscalationRequired());
+        assertEquals(without.confidence(), withPage.confidence());
+
+        // Prove retrieval always receives the raw question string — pageRoute and
+        // surface must never leak into the retrieval call.
+        ArgumentCaptor<String> questionCaptor = ArgumentCaptor.forClass(String.class);
+        verify(retrieval, atLeast(2)).retrieve(questionCaptor.capture());
+        List<String> capturedQuestions = questionCaptor.getAllValues();
+        // Every captured question must equal the original PMI question string.
+        capturedQuestions.forEach(q ->
+                assertEquals("What is PMI?", q,
+                        "retrieve() must be called with the original question, not pageRoute/surface"));
+    }
+
+    @Test
+    void badSurfaceThrowsIllegalArgumentException() {
+        // A malformed surface on an EDUCATIONAL question surfaces as
+        // IllegalArgumentException -> HTTP 400 via GlobalExceptionHandler.
+        String groundedJson = """
+                {"answer":"PMI is private mortgage insurance.",
+                 "citations":[],
+                 "confidence":0.85,
+                 "human_escalation_required":false,
+                 "disclaimer":"d"}""";
+        AskService service = askServiceReturning(groundedJson, List.of(
+                chunk("Fannie Mae Selling Guide", "selling-guide.pdf", "B7-1", 1, LocalDate.of(2026, 1, 1))));
+
+        assertThrows(IllegalArgumentException.class,
+                () -> service.ask(pmiQuestionWith(null, "SIDEWAYS")));
     }
 }

@@ -13,6 +13,8 @@ import com.msfg.rag.repository.AnswerSourceRepository;
 import com.msfg.rag.repository.ConversationRepository;
 import com.msfg.rag.repository.MessageRepository;
 import com.msfg.rag.service.ai.AnswerValidationService;
+import com.msfg.rag.service.ai.Intent;
+import com.msfg.rag.service.ai.IntentRouterService;
 import com.msfg.rag.service.ai.ModelAnswer;
 import com.msfg.rag.service.ai.ModelRouterService;
 import com.msfg.rag.service.ai.PromptBuilderService;
@@ -55,6 +57,7 @@ public class AskService {
     private final MessageRepository messageRepository;
     private final AnswerSourceRepository answerSourceRepository;
     private final ObjectMapper objectMapper;
+    private final IntentRouterService intentRouterService;
 
     public AskService(DomainPack pack,
                       QuestionClassifierService questionClassifierService,
@@ -66,7 +69,8 @@ public class AskService {
                       ConversationRepository conversationRepository,
                       MessageRepository messageRepository,
                       AnswerSourceRepository answerSourceRepository,
-                      ObjectMapper objectMapper) {
+                      ObjectMapper objectMapper,
+                      IntentRouterService intentRouterService) {
         this.canned = pack.guardrails().cannedAnswers();
         this.questionClassifierService = questionClassifierService;
         this.retrievalService = retrievalService;
@@ -78,6 +82,7 @@ public class AskService {
         this.messageRepository = messageRepository;
         this.answerSourceRepository = answerSourceRepository;
         this.objectMapper = objectMapper;
+        this.intentRouterService = intentRouterService;
     }
 
     @Transactional
@@ -92,6 +97,15 @@ public class AskService {
             return refuse(conversation, request, RetrievalResult.empty(),
                     categoryAnswer(category, canned), null, "classified as " + category);
         }
+
+        // Routing seam (Phase 5): compute + log intent, validate surface — consumed by the Phase 6 planner.
+        // This is a distinct post-EDUCATIONAL-gate step, not a sub-step of the compliance gate above.
+        // A bad surface value throws IllegalArgumentException -> HTTP 400 via GlobalExceptionHandler.
+        // Nothing else reads intent yet; the flow below is byte-identical to today.
+        Intent intent = intentRouterService.route(
+                request.question(), request.pageRoute(), request.surface());
+        log.info("Routed question to intent {} (pageRoute={}, surface={})",
+                intent, request.pageRoute(), request.surface());
 
         // 1. Retrieve approved source context.
         RetrievalResult retrieval = retrievalService.retrieve(request.question());
