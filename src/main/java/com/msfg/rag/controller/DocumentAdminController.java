@@ -11,9 +11,13 @@ import com.msfg.rag.service.sync.SyncReport;
 import com.msfg.rag.service.sync.SyncService;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import com.msfg.rag.dto.DocumentUpdateRequest;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -99,6 +103,40 @@ public class DocumentAdminController {
     @PostMapping("/{id}/deactivate")
     public ResponseEntity<DocumentDto> deactivate(@PathVariable UUID id) {
         return setActive(id, false);
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Map<String, Object>> delete(@PathVariable UUID id) {
+        ingestionService.delete(id);
+        return ResponseEntity.ok(Map.of("deleted", true, "id", id));
+    }
+
+    @PatchMapping("/{id}")
+    public ResponseEntity<DocumentDto> update(@PathVariable UUID id,
+                                              @RequestBody DocumentUpdateRequest req) {
+        MortgageDocument document = documentRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Document not found: " + id));
+
+        if (req.title() == null || req.title().isBlank()) {
+            throw new IllegalArgumentException("title is required");
+        }
+        if (req.sourceName() == null || req.sourceName().isBlank()) {
+            throw new IllegalArgumentException("sourceName is required");
+        }
+        if (req.sourceType() == null || req.sourceType().isBlank()) {
+            throw new IllegalArgumentException("sourceType is required");
+        }
+        // Throws IllegalArgumentException (→ 400) on an unknown enum value.
+        SourceType type = SourceType.valueOf(req.sourceType());
+
+        document.setTitle(req.title().strip());
+        document.setSourceName(req.sourceName().strip());
+        document.setSourceType(type);
+        document.setDocumentVersion(req.documentVersion());
+        document.setEffectiveDate(req.effectiveDate());
+        document.setExpirationDate(req.expirationDate());
+
+        return ResponseEntity.ok(DocumentDto.from(documentRepository.save(document)));
     }
 
     /**

@@ -107,6 +107,27 @@ public class DocumentIngestionService {
         }
     }
 
+    /**
+     * Hard-deletes a document: its chunks, its stored file, and the row.
+     * The whole operation is transactional — if the file delete fails, the
+     * chunk and row deletes roll back too, so a document is never left
+     * half-removed. A null storage key (a document with no stored file) is
+     * skipped.
+     */
+    @Transactional
+    public void delete(UUID documentId) {
+        MortgageDocument document = documentRepository.findById(documentId)
+                .orElseThrow(() -> new IllegalArgumentException("Document not found: " + documentId));
+
+        chunkRepository.deleteByDocumentId(documentId);
+        String storageKey = document.getS3Key();
+        if (storageKey != null) {
+            storageService.delete(storageKey);
+        }
+        documentRepository.delete(document);
+        log.info("Deleted document '{}' ({})", document.getTitle(), document.getFileName());
+    }
+
     private int extractChunkAndEmbed(MortgageDocument document, InputStream content) {
         String text = textExtractionService.extract(content, document.getFileName());
         if (text.isBlank()) {

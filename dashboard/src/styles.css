@@ -332,3 +332,25 @@ input:focus, select:focus { border-color: var(--accent); box-shadow: 0 0 0 2px r
   padding: 6px 0;
   border-bottom: 1px solid var(--border);
 }
+
+/* Modal backdrop — used by Corpus edit modal */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  z-index: 100;
+  overflow-y: auto;
+}
+
+/* Destructive action button */
+button.danger {
+  color: #dc2626;
+  border-color: #dc2626;
+  background: var(--surface);
+}
+
+button.danger:hover:not(:disabled) {
+  background: #fef2f2;
+  border-color: #b91c1c;
+  color: #b91c1c;
+}

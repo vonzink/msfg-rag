@@ -65,3 +65,8 @@ export interface VocabRevisionDto {
   revision: number; createdAt: string; createdBy: string;
   reverted: boolean; content: string | null;
 }
+export interface DocumentUpdate {
+  title: string; sourceName: string; sourceType: string;
+  documentVersion: string | null;
+  effectiveDate: string | null; expirationDate: string | null;
+}
