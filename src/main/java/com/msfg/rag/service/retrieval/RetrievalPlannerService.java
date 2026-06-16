@@ -23,17 +23,25 @@ import java.util.Set;
  *
  * <p><b>Minimal by design:</b> {@link RetrievalPlan} carries only the index set —
  * weights and page-boost (spec §7.4) are deferred to Phase 7.
+ *
+ * <p><b>Phase 7:</b> {@code collect} now returns the side-evidence already
+ * authority-ordered via {@link AuthorityFilterService#order} (links
+ * PRIMARY→SECONDARY→BACKGROUND, page-guide order preserved). This is still an
+ * INERT seam — the caller logs it and otherwise discards it until Phase 8.
  */
 @Service
 public class RetrievalPlannerService {
 
     private final PageGuideService pageGuideService;
     private final SourceLinkService sourceLinkService;
+    private final AuthorityFilterService authorityFilterService;
 
     public RetrievalPlannerService(PageGuideService pageGuideService,
-                                   SourceLinkService sourceLinkService) {
+                                   SourceLinkService sourceLinkService,
+                                   AuthorityFilterService authorityFilterService) {
         this.pageGuideService = pageGuideService;
         this.sourceLinkService = sourceLinkService;
+        this.authorityFilterService = authorityFilterService;
     }
 
     /**
@@ -81,6 +89,8 @@ public class RetrievalPlannerService {
         var links = plan.includes(SourceKind.LINK_REGISTRY)
                 ? sourceLinkService.match(question, surface)
                 : List.<BrainSourceLink>of();
-        return new PlannedEvidence(pageGuides, links);
+        // Phase 7: tier + order the collected side-evidence (links PRIMARY-first)
+        // so Phase 8 can emit it trust-first. INERT — same membership, only order.
+        return authorityFilterService.order(new PlannedEvidence(pageGuides, links));
     }
 }

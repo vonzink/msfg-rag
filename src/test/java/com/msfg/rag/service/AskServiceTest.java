@@ -21,6 +21,7 @@ import com.msfg.rag.domain.BrainPageGuide;
 import com.msfg.rag.domain.BrainSourceLink;
 import com.msfg.rag.domain.LinkAuthority;
 import com.msfg.rag.domain.Surface;
+import com.msfg.rag.service.retrieval.AuthorityFilterService;
 import com.msfg.rag.service.retrieval.PageGuideService;
 import com.msfg.rag.service.retrieval.RetrievalPlannerService;
 import com.msfg.rag.service.retrieval.RetrievalResult;
@@ -114,7 +115,7 @@ class AskServiceTest {
                 new AnswerValidationService(TestPacks.msfg()), audit,
                 conversations, messages, sources, new ObjectMapper(),
                 new IntentRouterService(),
-                new RetrievalPlannerService(pageGuides, sourceLinks));
+                new RetrievalPlannerService(pageGuides, sourceLinks, new AuthorityFilterService()));
     }
 
     /** Builds an AskService that classifies every question as {@code category}. */
@@ -145,7 +146,8 @@ class AskServiceTest {
                 conversations, messages, sources, new ObjectMapper(),
                 new IntentRouterService(),
                 new RetrievalPlannerService(
-                        mock(PageGuideService.class), mock(SourceLinkService.class)));
+                        mock(PageGuideService.class), mock(SourceLinkService.class),
+                        new AuthorityFilterService()));
     }
 
     private AskRequest pmiQuestion() {
@@ -451,7 +453,7 @@ class AskServiceTest {
                 new AnswerValidationService(TestPacks.msfg()),
                 localAudit, localConversations, localMessages, localSources,
                 new ObjectMapper(), new IntentRouterService(),
-                new RetrievalPlannerService(pageGuides, sourceLinks));
+                new RetrievalPlannerService(pageGuides, sourceLinks, new AuthorityFilterService()));
 
         // Baseline: no pageRoute → collect() returns empty (CORPUS-only plan).
         AskResponse without  = service.ask(pmiQuestion());
