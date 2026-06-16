@@ -30,7 +30,7 @@ class RetrievalPlannerServiceTest {
     private final PageGuideService pageGuides = mock(PageGuideService.class);
     private final SourceLinkService sourceLinks = mock(SourceLinkService.class);
     private final RetrievalPlannerService planner =
-            new RetrievalPlannerService(pageGuides, sourceLinks);
+            new RetrievalPlannerService(pageGuides, sourceLinks, new AuthorityFilterService());
 
     // --- plan(): (intent x pageRoute) -> indexes ------------------------
 
@@ -135,5 +135,29 @@ class RetrievalPlannerServiceTest {
 
         verify(pageGuides).match("/loans/fha", "fha", null);
         verify(sourceLinks).match("fha", null);
+    }
+
+    @Test
+    void collectReturnsAuthorityOrderedLinks() {
+        // Matcher returns links OUT of authority order: BACKGROUND, PRIMARY, SECONDARY.
+        BrainSourceLink background = new BrainSourceLink(
+                "bg", "https://x.com", "x.com", LinkAuthority.BACKGROUND,
+                List.of("fha"), false, List.of(), List.of(), Surface.BOTH, "seed");
+        BrainSourceLink primary = new BrainSourceLink(
+                "pri", "https://x.com", "x.com", LinkAuthority.PRIMARY,
+                List.of("fha"), false, List.of(), List.of(), Surface.BOTH, "seed");
+        BrainSourceLink secondary = new BrainSourceLink(
+                "sec", "https://x.com", "x.com", LinkAuthority.SECONDARY,
+                List.of("fha"), false, List.of(), List.of(), Surface.BOTH, "seed");
+        when(sourceLinks.match("fha", null))
+                .thenReturn(List.of(background, primary, secondary));
+        RetrievalPlan plan = new RetrievalPlan(Set.of(SourceKind.CORPUS, SourceKind.LINK_REGISTRY));
+
+        PlannedEvidence evidence = planner.collect(plan, "fha", null, null);
+
+        // collect() returns the links authority-ordered: PRIMARY → SECONDARY → BACKGROUND.
+        assertEquals(
+                List.of(LinkAuthority.PRIMARY, LinkAuthority.SECONDARY, LinkAuthority.BACKGROUND),
+                evidence.links().stream().map(BrainSourceLink::getAuthority).toList());
     }
 }
