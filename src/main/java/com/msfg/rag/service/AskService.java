@@ -135,10 +135,11 @@ public class AskService {
         }
 
         // Collect seam (Phase 6): gather matching page guides + source links for
-        // the planned side indexes. INERT — collected + logged only; NOT passed to
-        // the prompt, the model, the validator, or the AskResponse. Phase 8 will
-        // consume this to emit recommendedPage/links/nextAction. Runs only on the
-        // proceed path so refusal semantics stay byte-identical to today.
+        // the planned side indexes, authority-ordered (Phase 7). Consumed by the
+        // output contract (Phase 8) to emit recommendedPage/links/nextAction; it is
+        // NEVER fed to the prompt, the model, or the validator (the LLM answer stays
+        // corpus-grounded). Runs only on the proceed path so refusal semantics stay
+        // byte-identical to today.
         PlannedEvidence sideEvidence = retrievalPlannerService.collect(
                 plan, request.question(), request.pageRoute(), request.surface());
         log.info("Planned side-evidence: guides={}, links={}, indexes={}",
