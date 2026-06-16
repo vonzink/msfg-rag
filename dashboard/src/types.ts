@@ -70,3 +70,33 @@ export interface DocumentUpdate {
   documentVersion: string | null;
   effectiveDate: string | null; expirationDate: string | null;
 }
+
+export interface SourceLinkDto {
+  id: string;
+  name: string;
+  url: string;
+  domain: string | null;
+  authority: string;
+  topics: string[];
+  freshness_required: boolean;
+  allowed_use: string[];
+  do_not_use_for: string[];
+  surface: string;
+  active: boolean;
+  created_at: string | null;
+  created_by: string | null;
+  updated_at: string | null;
+  updated_by: string | null;
+}
+
+export interface SourceLinkRequest {
+  name: string;
+  url: string;
+  domain: string | null;
+  authority: string;
+  topics: string[];
+  freshnessRequired: boolean;
+  allowedUse: string[];
+  doNotUseFor: string[];
+  surface: string;
+}
