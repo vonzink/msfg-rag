@@ -232,6 +232,43 @@ class MsfgGoldenPackTest {
     }
 
     @Test
+    void sourceLinksMatchSeed() {
+        List<DomainPack.SourceLink> links = PACK.sourceLinks();
+        assertEquals(5, links.size());
+
+        DomainPack.SourceLink fannie = links.get(0);
+        assertEquals("Fannie Mae Selling Guide", fannie.name());
+        assertEquals("https://selling-guide.fanniemae.com/", fannie.url());
+        assertEquals("fanniemae.com", fannie.domain());
+        assertEquals("PRIMARY", fannie.authority());
+        assertEquals(List.of("conventional", "conforming", "underwriting", "appraisal"), fannie.topics());
+        assertTrue(fannie.freshnessRequired());
+        assertEquals(List.of("cite conventional underwriting and eligibility requirements"), fannie.allowedUse());
+        assertEquals(List.of("FHA, VA, or USDA program rules"), fannie.doNotUseFor());
+        assertEquals("BOTH", fannie.surface());
+
+        assertEquals("Freddie Mac Single-Family Seller/Servicer Guide", links.get(1).name());
+        assertEquals("freddiemac.com", links.get(1).domain());
+        assertEquals("PRIMARY", links.get(1).authority());
+
+        assertEquals("HUD Handbook 4000.1 (FHA Single Family Housing Policy Handbook)", links.get(2).name());
+        assertEquals("hud.gov", links.get(2).domain());
+
+        assertEquals("VA Lender's Handbook (M26-7)", links.get(3).name());
+        assertEquals("benefits.va.gov", links.get(3).domain());
+
+        assertEquals("USDA Single Family Housing Guaranteed Loan Program Handbook (HB-1-3555)", links.get(4).name());
+        assertEquals("rd.usda.gov", links.get(4).domain());
+
+        // every seeded link is PRIMARY / BOTH and freshness-required
+        for (DomainPack.SourceLink link : links) {
+            assertEquals("PRIMARY", link.authority());
+            assertEquals("BOTH", link.surface());
+            assertTrue(link.freshnessRequired());
+        }
+    }
+
+    @Test
     void retrievalRulesMatchLegacy() {
         // Full acronym map — 30 entries
         assertEquals(Map.ofEntries(
