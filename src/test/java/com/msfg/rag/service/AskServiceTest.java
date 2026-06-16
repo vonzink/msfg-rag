@@ -11,6 +11,7 @@ import com.msfg.rag.repository.MessageRepository;
 import com.msfg.rag.pack.TestPacks;
 import com.msfg.rag.service.ai.AnswerValidationService;
 import com.msfg.rag.service.ai.IntentRouterService;
+import com.msfg.rag.service.ai.OutputContractService;
 import com.msfg.rag.service.ai.ModelAnswer;
 import com.msfg.rag.service.ai.ModelRouterService;
 import com.msfg.rag.service.ai.PromptBuilderService;
@@ -115,7 +116,8 @@ class AskServiceTest {
                 new AnswerValidationService(TestPacks.msfg()), audit,
                 conversations, messages, sources, new ObjectMapper(),
                 new IntentRouterService(),
-                new RetrievalPlannerService(pageGuides, sourceLinks, new AuthorityFilterService()));
+                new RetrievalPlannerService(pageGuides, sourceLinks, new AuthorityFilterService()),
+                new OutputContractService());
     }
 
     /** Builds an AskService that classifies every question as {@code category}. */
@@ -147,7 +149,8 @@ class AskServiceTest {
                 new IntentRouterService(),
                 new RetrievalPlannerService(
                         mock(PageGuideService.class), mock(SourceLinkService.class),
-                        new AuthorityFilterService()));
+                        new AuthorityFilterService()),
+                new OutputContractService());
     }
 
     private AskRequest pmiQuestion() {
@@ -395,12 +398,10 @@ class AskServiceTest {
     }
 
     @Test
-    void collectOnlySeamDiscardsNonEmptyEvidence() {
-        // Phase 6 collect-only (NON-EMPTY evidence path): stubs the matchers to
-        // return a real BrainPageGuide + BrainSourceLink so collect() yields non-empty
-        // PlannedEvidence. Proves the actual Phase 6 contract: collected NON-EMPTY
-        // side-evidence is discarded without altering the AskResponse answer or
-        // citations — the planner seam is inert in Phase 6.
+    void sideEvidenceDoesNotChangeTheCorpusAnswer() {
+        // As of Phase 8 the collected side-evidence IS emitted (into recommendedPage/links/
+        // nextAction); this test now asserts only that the LLM answer + citations are
+        // unaffected by the presence of side-evidence. Assertions are unchanged.
         String groundedJson = """
                 {"answer":"PMI is private mortgage insurance that may be required on conventional loans.",
                  "citations":[],
@@ -453,7 +454,8 @@ class AskServiceTest {
                 new AnswerValidationService(TestPacks.msfg()),
                 localAudit, localConversations, localMessages, localSources,
                 new ObjectMapper(), new IntentRouterService(),
-                new RetrievalPlannerService(pageGuides, sourceLinks, new AuthorityFilterService()));
+                new RetrievalPlannerService(pageGuides, sourceLinks, new AuthorityFilterService()),
+                new OutputContractService());
 
         // Baseline: no pageRoute → collect() returns empty (CORPUS-only plan).
         AskResponse without  = service.ask(pmiQuestion());
@@ -476,5 +478,117 @@ class AskServiceTest {
         questionCaptor.getAllValues().forEach(q ->
                 assertEquals("What is PMI?", q,
                         "retrieve() must receive the original question, not side-evidence"));
+    }
+
+    @Test
+    void happyPathPopulatesRecommendedPageLinksAndNextAction() {
+        // A grounded answer whose side-evidence has a matched page guide + link.
+        // The Output Contract must surface recommendedPage/links/nextAction from
+        // the (authority-ordered) PlannedEvidence — without changing the answer.
+        String groundedJson = """
+                {"answer":"PMI is private mortgage insurance that may be required on conventional loans.",
+                 "citations":[],
+                 "confidence":0.85,
+                 "human_escalation_required":false,
+                 "disclaimer":"d"}""";
+        List<RetrievedChunk> chunks = List.of(
+                chunk("Fannie Mae Selling Guide", "selling-guide.pdf", "B7-1", 1, LocalDate.of(2026, 1, 1)));
+
+        PageGuideService pageGuides = mock(PageGuideService.class);
+        BrainPageGuide matchedGuide = new BrainPageGuide(
+                "/loan-options", "Loan Options", "Overview of loan options", Surface.PUBLIC,
+                List.of(), List.of("Compare your loan options on this page."),
+                List.of(), List.of(), List.of("pmi"), "seed");
+        when(pageGuides.match(any(), anyString(), any())).thenReturn(List.of(matchedGuide));
+
+        SourceLinkService sourceLinks = mock(SourceLinkService.class);
+        BrainSourceLink matchedLink = new BrainSourceLink(
+                "Fannie Mae", "https://fanniemae.com", "fanniemae.com", LinkAuthority.PRIMARY,
+                List.of("pmi"), false, List.of(), List.of(), Surface.PUBLIC, "seed");
+        when(sourceLinks.match(anyString(), any())).thenReturn(List.of(matchedLink));
+
+        RetrievalService localRetrieval = mock(RetrievalService.class);
+        when(localRetrieval.retrieve(anyString())).thenReturn(new RetrievalResult(chunks, 1.0, true));
+        PromptBuilderService localPrompt = mock(PromptBuilderService.class);
+        when(localPrompt.build(anyString(), anyList())).thenReturn("prompt");
+        when(localPrompt.disclaimer()).thenReturn("pack-disclaimer");
+        ModelRouterService localRouter = mock(ModelRouterService.class);
+        AiResponse localAiResponse = new AiResponse(groundedJson, "anthropic", "claude", 10, 10);
+        when(localRouter.generate(any()))
+                .thenReturn(new ModelRouterService.RoutedResponse(localAiResponse, false));
+        AuditLogService localAudit = mock(AuditLogService.class);
+        ConversationRepository localConversations = mock(ConversationRepository.class);
+        when(localConversations.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        MessageRepository localMessages = mock(MessageRepository.class);
+        when(localMessages.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        AnswerSourceRepository localSources = mock(AnswerSourceRepository.class);
+        when(localSources.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        QuestionClassifierService localClassifier = mock(QuestionClassifierService.class);
+        when(localClassifier.classify(anyString())).thenReturn(QuestionCategory.EDUCATIONAL);
+
+        AskService service = new AskService(
+                TestPacks.msfg(), localClassifier, localRetrieval, localPrompt, localRouter,
+                new AnswerValidationService(TestPacks.msfg()), localAudit,
+                localConversations, localMessages, localSources, new ObjectMapper(),
+                new IntentRouterService(),
+                new RetrievalPlannerService(pageGuides, sourceLinks, new AuthorityFilterService()),
+                new OutputContractService());
+
+        AskResponse response = service.ask(pmiQuestionWith("/loan-options", "PUBLIC"));
+
+        // Answer is unchanged (corpus-grounded).
+        assertEquals("PMI is private mortgage insurance that may be required on conventional loans.",
+                response.answer());
+        assertFalse(response.humanEscalationRequired());
+        // recommendedPage from the top guide.
+        assertEquals("/loan-options", response.recommendedPage().route());
+        assertEquals("Loan Options", response.recommendedPage().label());
+        // links from the (single) matched registry link.
+        assertEquals(1, response.links().size());
+        assertEquals("Fannie Mae", response.links().get(0).name());
+        assertEquals("https://fanniemae.com", response.links().get(0).url());
+        assertEquals("PRIMARY", response.links().get(0).authority());
+        // nextAction = the guide's first allowed-guidance entry.
+        assertEquals("Compare your loan options on this page.", response.nextAction());
+    }
+
+    @Test
+    void emptyEvidenceHappyPathLeavesContractEmptyAndAnswerIdentical() {
+        // The shared askServiceReturning builder stubs both matchers to List.of(),
+        // so collect() returns empty PlannedEvidence → the Output Contract is
+        // (null, [], null) and the answer/citations are byte-identical to baseline.
+        String groundedJson = """
+                {"answer":"PMI is private mortgage insurance that may be required on conventional loans.",
+                 "citations":[],
+                 "confidence":0.85,
+                 "human_escalation_required":false,
+                 "disclaimer":"d"}""";
+        List<RetrievedChunk> chunks = List.of(
+                chunk("Fannie Mae Selling Guide", "selling-guide.pdf", "B7-1", 1, LocalDate.of(2026, 1, 1)),
+                chunk("Fannie Mae Selling Guide", "selling-guide.pdf", "B7-2", 2, LocalDate.of(2026, 1, 1)));
+
+        AskResponse response = askServiceReturning(groundedJson, chunks).ask(pmiQuestion());
+
+        // Backward-compat: the answer + citations are exactly as before Phase 8.
+        assertEquals("PMI is private mortgage insurance that may be required on conventional loans.",
+                response.answer());
+        assertEquals(2, response.citations().size());
+        assertFalse(response.humanEscalationRequired());
+        // The Output Contract is empty when there is no side-evidence.
+        assertNull(response.recommendedPage());
+        assertTrue(response.links().isEmpty());
+        assertNull(response.nextAction());
+    }
+
+    @Test
+    void refusePathLeavesContractNullAndEmpty() {
+        // A category refusal (LEGAL) routes through refuse() — the Output Contract
+        // fields must be null/empty/null so a refusal never leaks a page or links.
+        AskResponse response = askServiceClassifying(QuestionCategory.LEGAL).ask(pmiQuestion());
+
+        assertTrue(response.humanEscalationRequired());
+        assertNull(response.recommendedPage());
+        assertTrue(response.links().isEmpty());
+        assertNull(response.nextAction());
     }
 }

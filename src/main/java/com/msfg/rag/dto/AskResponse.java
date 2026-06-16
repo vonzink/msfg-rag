@@ -5,6 +5,14 @@ import java.util.UUID;
 
 /**
  * Public website answer response (rag.md format).
+ *
+ * <p>Phase 8 (spec §6.3) appends three OPTIONAL, SERVER-DERIVED fields:
+ * {@code recommendedPage} (the top matched page guide as {@code {route,label}}),
+ * {@code links} (active Link Registry rows resolved + authority-ordered by the
+ * planner), and {@code nextAction} (a deterministic next-step string). They are
+ * populated only on the success path; the refusal path sets them to
+ * {@code null / [] / null}. The corpus-grounded {@code answer} and
+ * {@code citations} are unchanged.
  */
 public record AskResponse(
         UUID conversationId,
@@ -12,6 +20,9 @@ public record AskResponse(
         List<CitationDto> citations,
         double confidence,
         boolean humanEscalationRequired,
-        String disclaimer
+        String disclaimer,
+        RecommendedPageDto recommendedPage,
+        List<LinkDto> links,
+        String nextAction
 ) {
 }
