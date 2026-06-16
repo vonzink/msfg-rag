@@ -10,7 +10,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.UUID;
 
 /**
@@ -106,6 +108,86 @@ public class PageGuideService {
             cachedAtNanos = now;
         }
         return cache;
+    }
+
+    /**
+     * Deterministic match of active page guides to a question (spec §7.5),
+     * reading the cached {@link #activePageGuides()} snapshot (never the repo).
+     * A guide matches when:
+     * <ol>
+     *   <li>{@code pageRoute} is non-blank and equals {@code guide.getRoute()}
+     *       (case-insensitive, trimmed) — a route-exact hit; OR</li>
+     *   <li>any of {@code guide.getTopics()} (lowercased) is a substring of the
+     *       lowercased {@code question} — a topic hit.</li>
+     * </ol>
+     * Surface filter: when {@code surface} is non-blank it is parsed leniently via
+     * {@code Surface.valueOf(surface.strip().toUpperCase(Locale.US))} (a bad value
+     * throws {@link IllegalArgumentException} → HTTP 400) and only guides whose
+     * {@code getSurface()} is that value or {@link Surface#BOTH} are kept; a
+     * null/blank surface applies no filter.
+     *
+     * <p>Route-exact matches are ordered ahead of topic-only matches (each group
+     * preserving snapshot order); a guide hitting both appears once. Returns a
+     * defensive copy; never throws on empty inputs.
+     *
+     * <p><b>Heuristic note:</b> topic matching is substring (not whole-token) and
+     * deliberately broad, mirroring the conservative-cue heuristic in
+     * {@code IntentRouterService}. It is deterministic and will be refined
+     * (word-boundary / embedding) once side-evidence is actually consumed
+     * (Phase 8). The lenient uppercasing surface parse diverges intentionally
+     * from the admin CRUD path's case-sensitive parse because this is the public
+     * ask path.
+     */
+    public List<BrainPageGuide> match(String pageRoute, String question, String surface) {
+        Surface required = parseSurface(surface);
+        boolean hasRoute = pageRoute != null && !pageRoute.isBlank();
+        String route = hasRoute ? pageRoute.strip() : null;
+        String haystack = (question == null) ? "" : question.toLowerCase(Locale.US);
+
+        LinkedHashSet<BrainPageGuide> routeHits = new LinkedHashSet<>();
+        LinkedHashSet<BrainPageGuide> topicHits = new LinkedHashSet<>();
+
+        for (BrainPageGuide guide : activePageGuides()) {
+            if (required != null && guide.getSurface() != required && guide.getSurface() != Surface.BOTH) {
+                continue;
+            }
+            if (hasRoute && guide.getRoute() != null && guide.getRoute().equalsIgnoreCase(route)) {
+                routeHits.add(guide);
+                continue;
+            }
+            if (!haystack.isBlank() && matchesTopic(guide.getTopics(), haystack)) {
+                topicHits.add(guide);
+            }
+        }
+
+        List<BrainPageGuide> out = new ArrayList<>(routeHits.size() + topicHits.size());
+        out.addAll(routeHits);
+        out.addAll(topicHits);
+        return out;
+    }
+
+    /** Lenient surface parse for the public ask path; null/blank → no filter (null). */
+    private static Surface parseSurface(String surface) {
+        if (surface == null || surface.isBlank()) {
+            return null;
+        }
+        return Surface.valueOf(surface.strip().toUpperCase(Locale.US));
+    }
+
+    /** True when any topic (lowercased) is a substring of the lowercased question. */
+    private static boolean matchesTopic(List<String> topics, String lowerQuestion) {
+        if (topics == null) {
+            return false;
+        }
+        for (String topic : topics) {
+            if (topic == null || topic.isBlank()) {
+                continue;
+            }
+            if (lowerQuestion.contains(topic.toLowerCase(Locale.US))) {
+                return true;
+            }
+        }
+        return false;
     }
 
     public void invalidate() {

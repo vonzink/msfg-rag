@@ -17,9 +17,16 @@ import com.msfg.rag.service.ai.PromptBuilderService;
 import com.msfg.rag.service.ai.QuestionCategory;
 import com.msfg.rag.service.ai.QuestionClassifierService;
 import com.msfg.rag.service.audit.AuditLogService;
+import com.msfg.rag.domain.BrainPageGuide;
+import com.msfg.rag.domain.BrainSourceLink;
+import com.msfg.rag.domain.LinkAuthority;
+import com.msfg.rag.domain.Surface;
+import com.msfg.rag.service.retrieval.PageGuideService;
+import com.msfg.rag.service.retrieval.RetrievalPlannerService;
 import com.msfg.rag.service.retrieval.RetrievalResult;
 import com.msfg.rag.service.retrieval.RetrievalService;
 import com.msfg.rag.service.retrieval.RetrievedChunk;
+import com.msfg.rag.service.retrieval.SourceLinkService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
@@ -98,10 +105,16 @@ class AskServiceTest {
         AnswerSourceRepository sources = mock(AnswerSourceRepository.class);
         when(sources.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
+        PageGuideService pageGuides = mock(PageGuideService.class);
+        when(pageGuides.match(any(), anyString(), any())).thenReturn(List.of());
+        SourceLinkService sourceLinks = mock(SourceLinkService.class);
+        when(sourceLinks.match(anyString(), any())).thenReturn(List.of());
+
         return new AskService(TestPacks.msfg(), classifier, retrieval, promptBuilder, router,
                 new AnswerValidationService(TestPacks.msfg()), audit,
                 conversations, messages, sources, new ObjectMapper(),
-                new IntentRouterService());
+                new IntentRouterService(),
+                new RetrievalPlannerService(pageGuides, sourceLinks));
     }
 
     /** Builds an AskService that classifies every question as {@code category}. */
@@ -130,7 +143,9 @@ class AskServiceTest {
         return new AskService(TestPacks.msfg(), classifier, retrieval, promptBuilder, router,
                 new AnswerValidationService(TestPacks.msfg()), audit,
                 conversations, messages, sources, new ObjectMapper(),
-                new IntentRouterService());
+                new IntentRouterService(),
+                new RetrievalPlannerService(
+                        mock(PageGuideService.class), mock(SourceLinkService.class)));
     }
 
     private AskRequest pmiQuestion() {
@@ -337,5 +352,127 @@ class AskServiceTest {
 
         assertThrows(IllegalArgumentException.class,
                 () -> service.ask(pmiQuestionWith(null, "SIDEWAYS")));
+    }
+
+    @Test
+    void collectOnlySeamDoesNotChangeTheAnswer() {
+        // Phase 6 collect-only (empty-evidence path): the shared askServiceReturning
+        // builder stubs both matchers to List.of(), so collect() returns empty
+        // PlannedEvidence. Proves that empty side-evidence does not change the answer
+        // or citations. The non-empty evidence case is covered by
+        // collectOnlySeamDiscardsNonEmptyEvidence below.
+        String groundedJson = """
+                {"answer":"PMI is private mortgage insurance that may be required on conventional loans.",
+                 "citations":[],
+                 "confidence":0.85,
+                 "human_escalation_required":false,
+                 "disclaimer":"d"}""";
+        List<RetrievedChunk> chunks = List.of(
+                chunk("Fannie Mae Selling Guide", "selling-guide.pdf", "B7-1", 1, LocalDate.of(2026, 1, 1)),
+                chunk("Fannie Mae Selling Guide", "selling-guide.pdf", "B7-2", 2, LocalDate.of(2026, 1, 1)));
+
+        AskService service = askServiceReturning(groundedJson, chunks);
+
+        AskResponse without  = service.ask(pmiQuestion());
+        AskResponse withPage = service.ask(pmiQuestionWith("/loan-options", "PUBLIC"));
+
+        // The collected side-evidence must not alter the answer.
+        assertEquals(without.answer(), withPage.answer(),
+                "collected page guides/links must not change the answer in Phase 6");
+        assertEquals(without.citations(), withPage.citations(),
+                "collected side-evidence must not change citations");
+        assertEquals(without.humanEscalationRequired(), withPage.humanEscalationRequired());
+        assertEquals(without.confidence(), withPage.confidence());
+
+        // The corpus retrieval question must be the raw question, unchanged by the planner.
+        ArgumentCaptor<String> questionCaptor = ArgumentCaptor.forClass(String.class);
+        verify(retrieval, atLeast(2)).retrieve(questionCaptor.capture());
+        questionCaptor.getAllValues().forEach(q ->
+                assertEquals("What is PMI?", q,
+                        "retrieve() must receive the original question, never side-evidence"));
+    }
+
+    @Test
+    void collectOnlySeamDiscardsNonEmptyEvidence() {
+        // Phase 6 collect-only (NON-EMPTY evidence path): stubs the matchers to
+        // return a real BrainPageGuide + BrainSourceLink so collect() yields non-empty
+        // PlannedEvidence. Proves the actual Phase 6 contract: collected NON-EMPTY
+        // side-evidence is discarded without altering the AskResponse answer or
+        // citations — the planner seam is inert in Phase 6.
+        String groundedJson = """
+                {"answer":"PMI is private mortgage insurance that may be required on conventional loans.",
+                 "citations":[],
+                 "confidence":0.85,
+                 "human_escalation_required":false,
+                 "disclaimer":"d"}""";
+        List<RetrievedChunk> chunks = List.of(
+                chunk("Fannie Mae Selling Guide", "selling-guide.pdf", "B7-1", 1, LocalDate.of(2026, 1, 1)),
+                chunk("Fannie Mae Selling Guide", "selling-guide.pdf", "B7-2", 2, LocalDate.of(2026, 1, 1)));
+
+        // Build matcher mocks that return non-empty results — reusing the same
+        // 10-arg constructors used in RetrievalPlannerServiceTest / Task 5.
+        PageGuideService pageGuides = mock(PageGuideService.class);
+        BrainPageGuide matchedGuide = new BrainPageGuide(
+                "/loan-options", "Loan Options", "Overview of loan options", Surface.PUBLIC,
+                List.of(), List.of(), List.of(), List.of(), List.of("pmi"), "seed");
+        when(pageGuides.match(any(), anyString(), any())).thenReturn(List.of(matchedGuide));
+
+        SourceLinkService sourceLinks = mock(SourceLinkService.class);
+        BrainSourceLink matchedLink = new BrainSourceLink(
+                "Fannie Mae", "https://fanniemae.com", "fanniemae.com", LinkAuthority.PRIMARY,
+                List.of("pmi"), false, List.of(), List.of(), Surface.PUBLIC, "seed");
+        when(sourceLinks.match(anyString(), any())).thenReturn(List.of(matchedLink));
+
+        // Build a dedicated AskService with the non-empty matcher mocks.
+        RetrievalService localRetrieval = mock(RetrievalService.class);
+        when(localRetrieval.retrieve(anyString())).thenReturn(new RetrievalResult(chunks, 1.0, true));
+        PromptBuilderService localPrompt = mock(PromptBuilderService.class);
+        when(localPrompt.build(anyString(), anyList())).thenReturn("prompt");
+        when(localPrompt.disclaimer()).thenReturn("pack-disclaimer");
+        ModelRouterService localRouter = mock(ModelRouterService.class);
+        AiResponse localAiResponse = new AiResponse(groundedJson, "anthropic", "claude", 10, 10);
+        when(localRouter.generate(any()))
+                .thenReturn(new ModelRouterService.RoutedResponse(localAiResponse, false));
+        AuditLogService localAudit = mock(AuditLogService.class);
+        ConversationRepository localConversations = mock(ConversationRepository.class);
+        when(localConversations.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        MessageRepository localMessages = mock(MessageRepository.class);
+        when(localMessages.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        AnswerSourceRepository localSources = mock(AnswerSourceRepository.class);
+        when(localSources.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        QuestionClassifierService localClassifier = mock(QuestionClassifierService.class);
+        when(localClassifier.classify(anyString())).thenReturn(QuestionCategory.EDUCATIONAL);
+
+        AskService service = new AskService(
+                TestPacks.msfg(),
+                localClassifier,
+                localRetrieval, localPrompt, localRouter,
+                new AnswerValidationService(TestPacks.msfg()),
+                localAudit, localConversations, localMessages, localSources,
+                new ObjectMapper(), new IntentRouterService(),
+                new RetrievalPlannerService(pageGuides, sourceLinks));
+
+        // Baseline: no pageRoute → collect() returns empty (CORPUS-only plan).
+        AskResponse without  = service.ask(pmiQuestion());
+        // With pageRoute + surface → plan includes PAGE_GUIDE + LINK_REGISTRY,
+        // collect() returns non-empty PlannedEvidence (matchedGuide + matchedLink).
+        AskResponse withPage = service.ask(pmiQuestionWith("/loan-options", "PUBLIC"));
+
+        // The non-empty collected evidence must NOT alter the answer or citations.
+        assertEquals(without.answer(), withPage.answer(),
+                "non-empty collected page guides/links must not change the answer in Phase 6");
+        assertEquals(without.citations(), withPage.citations(),
+                "non-empty collected side-evidence must not change citations");
+        assertEquals(without.humanEscalationRequired(), withPage.humanEscalationRequired());
+        assertEquals(without.confidence(), withPage.confidence());
+
+        // The corpus retrieval question must be the raw question on both calls —
+        // the planner never wraps or replaces it.
+        ArgumentCaptor<String> questionCaptor = ArgumentCaptor.forClass(String.class);
+        verify(localRetrieval, atLeast(2)).retrieve(questionCaptor.capture());
+        questionCaptor.getAllValues().forEach(q ->
+                assertEquals("What is PMI?", q,
+                        "retrieve() must receive the original question, not side-evidence"));
     }
 }
