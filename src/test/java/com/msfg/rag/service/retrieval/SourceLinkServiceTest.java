@@ -150,6 +150,68 @@ class SourceLinkServiceTest {
         verify(repo, never()).delete(any());
     }
 
+    // ---- match() : deterministic topic matching (Phase 6) --------------
+
+    private BrainSourceLink link(Surface surface, List<String> topics) {
+        return new BrainSourceLink(
+                "Name", "https://x.com", "x.com", LinkAuthority.PRIMARY,
+                topics, false, List.of(), List.of(), surface, "seed");
+    }
+
+    @Test
+    void matchByTopicSubstring() {
+        BrainSourceLink fha = link(Surface.BOTH, List.of("fha"));
+        BrainSourceLink va = link(Surface.BOTH, List.of("va"));
+        when(repo.findByActiveTrueOrderByCreatedAtDescIdDesc()).thenReturn(List.of(fha, va));
+
+        List<BrainSourceLink> matches = service.match("What is an FHA loan?", null);
+
+        assertEquals(1, matches.size());
+        assertEquals(List.of("fha"), matches.get(0).getTopics());
+    }
+
+    @Test
+    void matchSurfacePublicKeepsPublicAndBothExcludesInternal() {
+        BrainSourceLink pub = link(Surface.PUBLIC, List.of("alpha"));
+        BrainSourceLink both = link(Surface.BOTH, List.of("alpha"));
+        BrainSourceLink internal = link(Surface.INTERNAL, List.of("alpha"));
+        when(repo.findByActiveTrueOrderByCreatedAtDescIdDesc())
+                .thenReturn(List.of(pub, both, internal));
+
+        List<BrainSourceLink> matches = service.match("alpha topic", "PUBLIC");
+
+        assertEquals(2, matches.size());
+        assertTrue(matches.stream().noneMatch(l -> l.getSurface() == Surface.INTERNAL));
+    }
+
+    @Test
+    void matchNullSurfaceKeepsAllSurfaces() {
+        BrainSourceLink pub = link(Surface.PUBLIC, List.of("alpha"));
+        BrainSourceLink internal = link(Surface.INTERNAL, List.of("alpha"));
+        when(repo.findByActiveTrueOrderByCreatedAtDescIdDesc())
+                .thenReturn(List.of(pub, internal));
+
+        assertEquals(2, service.match("alpha topic", null).size());
+    }
+
+    @Test
+    void matchBlankQuestionIsEmpty() {
+        BrainSourceLink fha = link(Surface.BOTH, List.of("fha"));
+        when(repo.findByActiveTrueOrderByCreatedAtDescIdDesc()).thenReturn(List.of(fha));
+
+        assertTrue(service.match("   ", null).isEmpty());
+        assertTrue(service.match(null, null).isEmpty());
+    }
+
+    @Test
+    void matchBadSurfaceThrowsIllegalArgumentException() {
+        BrainSourceLink fha = link(Surface.BOTH, List.of("fha"));
+        when(repo.findByActiveTrueOrderByCreatedAtDescIdDesc()).thenReturn(List.of(fha));
+
+        assertThrows(IllegalArgumentException.class,
+                () -> service.match("fha", "SIDEWAYS"));
+    }
+
     @Test
     void activeLinksCachesFirstReadAndReusesUntilInvalidated() {
         BrainSourceLink a = new BrainSourceLink(

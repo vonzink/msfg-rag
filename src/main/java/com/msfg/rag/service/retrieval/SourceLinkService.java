@@ -11,6 +11,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.UUID;
 
 /**
@@ -107,6 +108,68 @@ public class SourceLinkService {
             cachedAtNanos = now;
         }
         return cache;
+    }
+
+    /**
+     * Deterministic match of active source links to a question (spec §7.5),
+     * reading the cached {@link #activeLinks()} snapshot (never the repo). A link
+     * matches when any of {@code link.getTopics()} (lowercased) is a substring of
+     * the lowercased {@code question}.
+     *
+     * <p>Surface filter: when {@code surface} is non-blank it is parsed leniently
+     * via {@code Surface.valueOf(surface.strip().toUpperCase(Locale.US))} (a bad
+     * value throws {@link IllegalArgumentException} → HTTP 400) and only links
+     * whose {@code getSurface()} is that value or {@link Surface#BOTH} are kept; a
+     * null/blank surface applies no filter. A null/blank question yields an empty
+     * list. Returns a defensive copy (snapshot order preserved).
+     *
+     * <p><b>Heuristic note:</b> topic matching is substring (not whole-token) and
+     * deliberately broad, mirroring the conservative-cue heuristic in
+     * {@code IntentRouterService}; deterministic and refined later (Phase 8). The
+     * lenient uppercasing surface parse diverges intentionally from the admin CRUD
+     * path's case-sensitive parse because this is the public ask path.
+     */
+    public List<BrainSourceLink> match(String question, String surface) {
+        Surface required = parseSurface(surface);
+        if (question == null || question.isBlank()) {
+            return new ArrayList<>();
+        }
+        String haystack = question.toLowerCase(Locale.US);
+
+        List<BrainSourceLink> out = new ArrayList<>();
+        for (BrainSourceLink link : activeLinks()) {
+            if (required != null && link.getSurface() != required && link.getSurface() != Surface.BOTH) {
+                continue;
+            }
+            if (matchesTopic(link.getTopics(), haystack)) {
+                out.add(link);
+            }
+        }
+        return out;
+    }
+
+    /** Lenient surface parse for the public ask path; null/blank → no filter (null). */
+    private static Surface parseSurface(String surface) {
+        if (surface == null || surface.isBlank()) {
+            return null;
+        }
+        return Surface.valueOf(surface.strip().toUpperCase(Locale.US));
+    }
+
+    /** True when any topic (lowercased) is a substring of the lowercased question. */
+    private static boolean matchesTopic(List<String> topics, String lowerQuestion) {
+        if (topics == null) {
+            return false;
+        }
+        for (String topic : topics) {
+            if (topic == null || topic.isBlank()) {
+                continue;
+            }
+            if (lowerQuestion.contains(topic.toLowerCase(Locale.US))) {
+                return true;
+            }
+        }
+        return false;
     }
 
     public void invalidate() {
