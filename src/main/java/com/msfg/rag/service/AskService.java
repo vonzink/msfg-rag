@@ -17,6 +17,7 @@ import com.msfg.rag.service.ai.Intent;
 import com.msfg.rag.service.ai.IntentRouterService;
 import com.msfg.rag.service.ai.ModelAnswer;
 import com.msfg.rag.service.ai.ModelRouterService;
+import com.msfg.rag.service.ai.OutputContractService;
 import com.msfg.rag.service.ai.PromptBuilderService;
 import com.msfg.rag.service.ai.QuestionCategory;
 import com.msfg.rag.service.ai.QuestionClassifierService;
@@ -62,6 +63,7 @@ public class AskService {
     private final ObjectMapper objectMapper;
     private final IntentRouterService intentRouterService;
     private final RetrievalPlannerService retrievalPlannerService;
+    private final OutputContractService outputContractService;
 
     public AskService(DomainPack pack,
                       QuestionClassifierService questionClassifierService,
@@ -75,7 +77,8 @@ public class AskService {
                       AnswerSourceRepository answerSourceRepository,
                       ObjectMapper objectMapper,
                       IntentRouterService intentRouterService,
-                      RetrievalPlannerService retrievalPlannerService) {
+                      RetrievalPlannerService retrievalPlannerService,
+                      OutputContractService outputContractService) {
         this.canned = pack.guardrails().cannedAnswers();
         this.questionClassifierService = questionClassifierService;
         this.retrievalService = retrievalService;
@@ -89,6 +92,7 @@ public class AskService {
         this.objectMapper = objectMapper;
         this.intentRouterService = intentRouterService;
         this.retrievalPlannerService = retrievalPlannerService;
+        this.outputContractService = outputContractService;
     }
 
     @Transactional
@@ -131,10 +135,11 @@ public class AskService {
         }
 
         // Collect seam (Phase 6): gather matching page guides + source links for
-        // the planned side indexes. INERT — collected + logged only; NOT passed to
-        // the prompt, the model, the validator, or the AskResponse. Phase 8 will
-        // consume this to emit recommendedPage/links/nextAction. Runs only on the
-        // proceed path so refusal semantics stay byte-identical to today.
+        // the planned side indexes, authority-ordered (Phase 7). Consumed by the
+        // output contract (Phase 8) to emit recommendedPage/links/nextAction; it is
+        // NEVER fed to the prompt, the model, or the validator (the LLM answer stays
+        // corpus-grounded). Runs only on the proceed path so refusal semantics stay
+        // byte-identical to today.
         PlannedEvidence sideEvidence = retrievalPlannerService.collect(
                 plan, request.question(), request.pageRoute(), request.surface());
         log.info("Planned side-evidence: guides={}, links={}, indexes={}",
@@ -201,8 +206,13 @@ public class AskService {
                 prompt, modelAnswer.answer(), routed.response().providerName(),
                 routed.response().modelName(), confidence, routed.fallbackUsed(), escalate);
 
+        // Phase 8: build the SERVER-SIDE output contract from the authority-ordered
+        // side-evidence collected above (line 138). recommendedPage/links/nextAction
+        // ride alongside the unchanged corpus-grounded answer.
+        OutputContractService.OutputContract contract = outputContractService.build(sideEvidence);
         return new AskResponse(conversation.getId(), modelAnswer.answer(), citations,
-                confidence, escalate, promptBuilderService.disclaimer());
+                confidence, escalate, promptBuilderService.disclaimer(),
+                contract.recommendedPage(), contract.links(), contract.nextAction());
     }
 
     // ------------------------------------------------------------------
@@ -234,7 +244,8 @@ public class AskService {
                 prompt, answerText, null, null, retrieval.confidence(), false, true);
 
         return new AskResponse(conversation.getId(), answerText, List.of(),
-                retrieval.confidence(), true, promptBuilderService.disclaimer());
+                retrieval.confidence(), true, promptBuilderService.disclaimer(),
+                null, List.of(), null);
     }
 
     private Conversation resolveConversation(AskRequest request) {
