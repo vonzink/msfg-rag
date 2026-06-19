@@ -24,3 +24,10 @@ node_modules/
 
 # Brainstorming visual-companion mockups (local, regenerable)
 .superpowers/
+
+# Understand-Anything dashboard launchers (machine-local: absolute path + localhost token)
+open-dashboard.command
+knowledge-graph-dashboard.webloc
+
+# Understand-Anything generated graph artifacts (regenerable)
+.understand-anything/
